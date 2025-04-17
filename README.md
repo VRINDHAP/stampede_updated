@@ -1,158 +1,218 @@
 # Stampede Risk Prediction Webapp
 
+This project implements a web application for analyzing video and image content to detect potential stampede risks based on crowd density. It utilizes computer vision techniques, a Flask web server, and integration with the Fluvio streaming data platform.
+
+---
+
+## Table of Contents
+
+- [Project Description](#project-description)
+- [Features](#features)
+- [Core Functionality](#core-functionality)
+  - [People Detection](#people-detection)
+  - [Density Grid Analysis](#density-grid-analysis)
+  - [Risk Status Determination](#risk-status-determination)
+  - [Fluvio Integration](#fluvio-integration)
+  - [Web Interface](#web-interface)
+- [File Structure](#file-structure)
+- [Setup](#setup)
+  - [Prerequisites](#prerequisites)
+  - [Setting up the Python Environment](#setting-up-the-python-environment)
+  - [Setting up Fluvio](#setting-up-fluvio)
+  - [Project File Setup](#project-file-setup)
+- [How to Run](#how-to-run)
+- [How to Use](#how-to-use)
+  - [Upload Media](#upload-media)
+  - [View Live Stream](#view-live-stream)
+- [Future Enhancements](#future-enhancements)
+
+---
+
 ## Project Description
 
-This project is a web application designed to analyze video feeds or uploaded media content (videos and images) to detect people, estimate crowd density using a grid-based approach, and predict potential stampede risks. The application provides a web interface for users to upload media or view a live camera feed, and it sends real-time density and status data to a Fluvio streaming data platform.
+The Stampede Risk Prediction Webapp provides tools to analyze crowd levels in visual media. It can process uploaded video files and images or connect to a live camera feed.
 
-Developed for a hackathon, this project demonstrates the integration of computer vision (using OpenCV and TensorFlow Object Detection), Flask web framework, and Fluvio for data streaming.
+The core process involves identifying individuals, calculating their distribution within a defined grid, and assessing density levels to flag potential high-risk areas or overall critical situations. All processing results, including density data and risk status, are published to a Fluvio topic for external consumption and analysis.
+
+---
 
 ## Features
 
-* Upload video or image files for analysis.
-* View a live camera feed (or fallback video) with real-time processing overlays.
-* Detect people in frames/images using a pre-trained ML model (SSD MobileNet V2).
-* Calculate crowd density based on a configurable grid overlaid on the analysis area.
-* Assign risk statuses ("Normal", "High Density Warning", "CRITICAL RISK") based on density thresholds.
-* Visualize risk levels with color-coded overlays on grid cells.
-* Display overall analysis status, maximum person count detected, and processing time.
-* For uploaded videos, display the "most critical" frame encountered during processing.
-* Provide a download link for the full processed video file.
-* Trigger an audible beep on the results page for critical risk detections in uploaded media.
-* Send real-time processing data (grid density, status, counts) to a Fluvio topic.
-* Includes a separate Python script (`predict_stampede.py`) to demonstrate consuming data from the Fluvio topic.
+- Analyze uploaded video files and images for crowd density and risk.
+- Provide a live camera feed view (or fallback video) with real-time processing overlays.
+- Utilize a pre-trained TensorFlow Object Detection model (SSD MobileNet V2) for people detection.
+- Implement a configurable grid system for spatial density analysis.
+- Determine and visualize risk statuses:
+  - `"Normal"`
+  - `"High Density Warning"`
+  - `"CRITICAL RISK"`
+- Overlay color-coded indicators on high-density grid cells.
+- Display processing metrics: overall status, max person count, and processing time.
+- For videos, save and display the frame with the highest risk status.
+- Download link for full processed video after analysis.
+- Audible beep on the results page for critical detections.
+- Publish frame-by-frame results to a Fluvio streaming data topic.
+- Separate consumer script (`predict_stampede.py`) for reading from Fluvio.
+
+---
+
+## Core Functionality
+
+### People Detection
+
+- Uses TensorFlow Hub model `ssd_mobilenet_v2/fpnlite_320x320`.
+- Filters detections by `person` class (index 1) and confidence threshold (default 0.25).
+- Extracts bounding boxes and detection scores.
+
+### Density Grid Analysis
+
+- Divides frame into an 8x8 grid (default).
+- Maps detected people to cells based on the center of their bounding boxes.
+- Populates a 2D `density_grid` with person counts per cell.
+
+### Risk Status Determination
+
+- Flags cells above `HIGH_DENSITY_THRESHOLD` or `CRITICAL_DENSITY_THRESHOLD`.
+- Statuses:
+  - `Normal`
+  - `High Density Cell Detected`
+  - `High Density Warning`
+  - `Critical Density Cell Detected`
+  - `CRITICAL RISK`
+- `STATUS_HIERARCHY` defines precedence for video-level status.
+
+### Fluvio Integration
+
+- Connects to a Fluvio cluster and sends frame data to a topic (`crowd-data` by default).
+- JSON payload includes:
+  - `timestamp`, `frame index`, `density_grid`, `frame_status`, etc.
+- `predict_stampede.py` demonstrates consuming these messages.
+
+### Web Interface
+
+- Built with Flask and Jinja2 templates.
+- Pages:
+  - `/` — Home page with upload options.
+  - `/live` — Live stream with processing overlay.
+  - `/video_feed` — MJPEG stream route.
+  - `/upload_media` — Handles media upload and processing.
+  - `/results` — Shows processed results and download options.
+
+---
 
 ## File Structure
 
-.
-├── static
-│   ├── debug_frames         (Not actively used in final version)
-│   ├── processed_frames     (Stores images of critical/display frames)
-│   ├── processed_images     (Stores processed uploaded images)
-│   ├── processed_videos     (Stores full processed uploaded videos)
-│   └── beep.mp3             (Required sound file for critical alert)
-├── templates
-│   ├── index.html           (Main upload/navigation page)
-│   ├── live.html            (Live stream viewing page)
-│   └── results.html         (Displays processing results for uploaded media)
-├── uploads                  (Temporarily stores uploaded files)
-├── venv                     (Python Virtual Environment - recommended)
-├── app.py                   (Main Flask application file)
-├── load_model.py            (Not used in final app.py - model loaded directly)
-├── predict_stampede.py      (Separate script to consume Fluvio data)
-├── send_crowd_data.py       (Functionality integrated into app.py)
-├── test_camera.py           (Not used in final app.py)
-├── test_fluvio.py           (Not used in final app.py)
-├── test.py                  (Not used in final app.py)
-└── videoplayback.mp4        (Optional: Fallback video file for live stream)
+```
+├── static/
+│   ├── debug_frames/        # Optional debug frames
+│   ├── processed_frames/    # Critical frames from videos
+│   ├── processed_images/    # Processed uploaded images
+│   ├── processed_videos/    # Full processed videos
+│   └── beep.mp3             # Sound for critical alert
+├── templates/
+│   ├── index.html           # Upload page
+│   ├── live.html            # Live stream viewer
+│   └── results.html         # Results page
+├── uploads/                 # Temporary upload storage
+├── venv/                    # (Optional) Python Virtual Env
+├── app.py                   # Main app logic
+├── predict_stampede.py      # Fluvio consumer example
+└── videoplayback.mp4        # Fallback video for webcam
+```
 
+---
 
 ## Setup
 
 ### Prerequisites
 
-* Python 3.7+
-* `pip` (Python package installer)
+- Python 3.7+
+- pip
+- Access to a Fluvio cluster (use WSL on Windows if needed)
 
-### Setting up the Environment
+### Setting up the Python Environment
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <your-repo-url>
-    cd <your-repo-name>
-    ```
-2.  **Create a Virtual Environment (Recommended):**
-    ```bash
-    python -m venv venv
-    ```
-3.  **Activate the Virtual Environment:**
-    * On Windows:
-        ```bash
-        venv\Scripts\activate
-        ```
-    * On macOS and Linux:
-        ```bash
-        source venv/bin/activate
-        ```
-4.  **Install Dependencies:**
-    ```bash
-    pip install Flask opencv-python tensorflow tensorflow-hub fluvio-python werkzeug mimetypes
-    ```
+```bash
+git clone <your-repo-url>
+cd <your-repo-name>
+python -m venv venv
+# Activate the virtual environment:
+# Windows
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
+pip install Flask opencv-python tensorflow tensorflow-hub fluvio-python werkzeug mimetypes
+```
 
 ### Setting up Fluvio
 
-Fluvio typically runs on Linux. If you are on Windows, using **WSL (Windows Subsystem for Linux)** is the recommended way to run a local Fluvio cluster.
+- Install Fluvio CLI: [Official Docs](https://www.fluvio.io/docs/install/)
+- Start local Fluvio cluster:
 
-1.  **Install Fluvio CLI:** Follow the official Fluvio installation guide for your operating system or WSL distribution: [https://www.fluvio.io/docs/install/](https://www.fluvio.io/docs/install/)
-2.  **Start a Local Fluvio Cluster:**
-    ```bash
-    fluvio cluster start
-    ```
-3.  **Create the Crowd Data Topic:**
-    ```bash
-    fluvio topic create crowd-data
-    ```
-    Ensure the topic name matches `FLUVIO_CROWD_TOPIC` in `app.py` and `predict_stampede.py`.
+```bash
+fluvio cluster start
+fluvio topic create crowd-data
+```
+
+Ensure the topic name matches `FLUVIO_CROWD_TOPIC` in `app.py`.
 
 ### Project File Setup
 
-1.  **ML Model:** The application automatically downloads the pre-trained TensorFlow Hub model on startup. You just need an internet connection when you run `app.py` for the first time.
-2.  **Sound File:** Place a short MP3 or WAV sound file (e.g., for a beep alert) in the `static` directory. Update the `<audio>` tag's `src` in `templates/results.html` if you use a different filename (`beep.mp3` is the default expected name).
-3.  **Fallback Video (Optional but Recommended):** For the live stream demo, place a video file named `videoplayback.mp4` in the root directory of your project (the same directory as `app.py`). This video will be used as a source if your webcam (`cv2.VideoCapture(0)`) fails to open.
+- **ML Model**: Auto-downloaded by `app.py` on first run.
+- **Sound File**: Place `beep.mp3` in `static/`. Update `results.html` if you change the name.
+- **Fallback Video**: Add `videoplayback.mp4` to the root directory.
+
+---
 
 ## How to Run
 
-1.  **Ensure your Fluvio cluster is running** (e.g., in your WSL terminal run `fluvio cluster start`).
-2.  **Ensure the `crowd-data` topic exists** (`fluvio topic list`).
-3.  **Open a terminal or command prompt** where your Python virtual environment is activated.
-4.  **Navigate to the project directory.**
-5.  **Run the Fluvio Consumer (Optional but good for demo):** Open a *separate* terminal where Fluvio client is installed (e.g., another WSL terminal) and run:
-    ```bash
-    python predict_stampede.py
-    ```
-    This script will connect to Fluvio and print the data it receives from the webapp.
-6.  **Run the Flask Application:** In the terminal where your Python virtual environment is activated, run:
-    ```bash
-    python app.py
-    ```
-    The Flask development server will start, typically at `http://localhost:5000/`.
+1. Start your Fluvio cluster:
+   ```bash
+   fluvio cluster start
+   fluvio topic create crowd-data
+   ```
+2. Run the Fluvio Consumer (optional):
+   ```bash
+   python predict_stampede.py
+   ```
+3. Start the Flask app:
+   ```bash
+   python app.py
+   ```
+   Access at [http://localhost:5000](http://localhost:5000)
+
+---
 
 ## How to Use
 
-1.  Open your web browser and go to `http://localhost:5000/`.
-2.  **Upload Media:**
-    * Click the "Choose File" button to select a video or image file.
-    * Click "Upload and Analyze".
-    * The application will process the file and redirect you to the results page (`results.html`).
-    * On the results page, you will see the overall risk status, max persons detected, processing time, and either the processed image (for images) or the most critical frame image (for videos). A button to download the full processed video will appear for video uploads.
-    * If the status is critical, you should hear a beep (check browser sound permissions).
-    * Data for each processed frame/image is sent to the `crowd-data` Fluvio topic, visible in the terminal running `predict_stampede.py`.
-3.  **View Live Stream:**
-    * Click the "View Live Stream" link on the index page or navigate directly to `http://localhost:5000/live`.
-    * This page (`live.html`) will display an MJPEG stream (`/video_feed`) from your webcam or the fallback video file.
-    * The video feed will show real-time processing overlays (density areas, status text).
-    * Data for each processed frame is sent to the `crowd-data` Fluvio topic, visible in the terminal running `predict_stampede.py`.
+### Upload Media
 
-## Project Structure Explanation
+1. Navigate to the main page.
+2. Choose an image/video file to upload.
+3. Click "Upload and Analyze".
+4. Wait for processing to complete.
+5. View:
+   - Overall Risk Status
+   - Max Persons Detected
+   - Processing Time
+   - Critical frame preview
+6. Download the full processed video (if applicable).
+7. A beep will play on `CRITICAL RISK` (browser sound must be on).
 
-* `app.py`: The main Flask application. Handles routing (`/`, `/upload_media`, `/live`, `/video_feed`), loads the ML model, contains the core `process_media_content` function, manages file uploads, video/image processing, saving results, and sending data to Fluvio.
-* `templates/`: Contains the HTML files rendered by Flask.
-    * `index.html`: The starting page with upload form and live stream link.
-    * `results.html`: Displays the output and metrics after uploading a file. Includes JavaScript for the critical alert beep and a download link for processed videos.
-    * `live.html`: Embeds the MJPEG stream from the `/video_feed` route to show live processing.
-* `static/`: Serves static files like CSS, JavaScript, and output media (`.mp4`, `.jpg`, `.mp3`).
-* `uploads/`: A temporary directory where uploaded files are saved before processing.
-* `predict_stampede.py`: A standalone script demonstrating how to consume the processed crowd data from the `crowd-data` Fluvio topic.
+### View Live Stream
 
-## Potential Improvements (Beyond Hackathon Scope)
+1. Go to [http://localhost:5000/live](http://localhost:5000/live)
+2. The system attempts to access the default webcam.
+3. If unavailable, `videoplayback.mp4` is used.
+4. Real-time overlays and statuses will be shown.
 
-* **Movement Analysis:** Implement object tracking and optical flow to detect panicked crowd movement, which is crucial for true stampede prediction beyond just density.
-* **Camera Calibration:** Implement perspective transformation for accurate density calculations from cameras not mounted directly overhead.
-* **Scalability:** Use background job queues (e.g., Celery) for file processing and explore distributed processing for multiple live feeds.
-* **Advanced Alerting:** Integrate email, SMS, or dashboard-based alerts triggered by critical status.
-* **User Interface:** Develop a more sophisticated dashboard showing live status for multiple cameras, historical data, and configuration options.
-* **Model Optimization:** Quantize the ML model or use a more lightweight architecture for better performance on edge devices.
+---
 
-This documentation covers the project setup, running, usage, and structure, along with acknowledging areas for future development, making it comprehensive for your GitHub repository. Remember to replace `<your-repo-url>` and `
+## Future Enhancements
 
-<your-repo-name>` with your actual GitHub details.
-
+- **Temporal Analysis**: Use movement tracking and optical flow for dynamic behavior analysis.
+- **Camera Calibration**: Adjust for perspective distortion to improve density measurement.
+- **Scalability**: Add background job queues (e.g., Celery) and multi-feed architecture.
+- **Advanced Alerting**: SMS, email, or push notifications for critical events.
+- **Dashboard**: Web dashboard for real-time and historical monitoring.
+- **Model Optimization**: Quantization or use of lighter ML models for better performance.
