@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+<head>
+    <title>Live Stampede Risk Feed</title>
+     <style>
+         body { font-family: sans-serif; margin: 20px; background-color: #f0f0f0; }
+         h1 { text-align: center; color: #333; }
+         img { display: block; margin: 20px auto; max-width: 90%; border: 2px solid #555; background-color: #fff;}
+         p { text-align: center; }
+         a { color: #007bff; }
+         a:hover { text-decoration: underline; }
+     </style>
+</head>
+<body>
+    <h1>Live Webcam Analysis</h1>
+    <p>Displaying processed feed from your webcam. Risk assessment is overlaid.</p>
+    <p>If the feed doesn't start, check console logs and ensure camera permissions are granted.</p>
+    <div>
+        <img src="{{ url_for('video_feed_route') }}" width="800" alt="Live Video Feed">
+        </div>
+     <p><a href="/">Back to Upload Page</a></p>
+</body>
+</html>

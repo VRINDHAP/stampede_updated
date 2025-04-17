@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+<head>
+    <title>Stampede Prediction</title>
+    <style>
+        /* Your CSS styles */
+        body { font-family: sans-serif; margin: 40px; line-height: 1.6; }
+        h1 { text-align: center; color: #333; }
+        .container { max-width: 600px; margin: 20px auto; padding: 30px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }
+        form div { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type=file] { display: block; margin-bottom: 15px; }
+        input[type=submit], .live-link a {
+            background-color: #007bff; color: white; padding: 10px 20px; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 1em; text-decoration: none; display: inline-block;
+        }
+        input[type=submit]:hover, .live-link a:hover { background-color: #0056b3; }
+        .live-link { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;}
+        .live-link a { background-color: #28a745; }
+        .live-link a:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stampede Risk Analysis</h1>
+
+        <form method="post" action="/upload_media" enctype="multipart/form-data">
+             <div>
+                 <label for="media">Upload Image or Video File:</label>
+                 <input type="file" id="media" name="media" accept="video/*,image/jpeg,image/png,image/gif" required>
+             </div>
+             <div>
+                 <input type="submit" value="Analyze Uploaded Media">
+             </div>
+        </form>
+
+        <div class="live-link">
+             <label>Or View Live Analysis:</label>
+             <a href="/live">Start Live Webcam Feed</a>
+        </div>
+    </div>
+</body>
+</html>

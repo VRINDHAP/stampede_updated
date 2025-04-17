@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+    <title>Processing Results</title>
+    <style>
+        /* Your CSS styles */
+        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333;}
+        .container { max-width: 900px; margin: 20px auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
+        h1, h2 { text-align: center; color: #333; margin-top: 0;}
+        h1 { margin-bottom: 20px; }
+
+        /* Style for video and image display */
+        video, img { display: block; margin: 20px auto; max-width: 100%; height: auto; border: 1px solid #ccc; background-color: #000; object-fit: contain; }
+        img { max-height: 70vh; /* Limit max height for large images */ }
+
+        /* Status container styling */
+        .status-container { text-align: center; margin-bottom: 20px; padding: 15px; border-radius: 5px; }
+        .status-normal { background-color: #e7f4e4; color: #2b7c2f; border: 1px solid #b7d4ae; }
+        .status-detected { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; } /* Used for High Density Cell Detected */
+        .status-warning { background-color: #fff3cd; color: #c57d07; border: 1px solid #ffeeba; } /* Used for High Density Warning */
+        .status-critical { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; font-weight: bold; } /* Used for Critical Density Detected, CRITICAL RISK, and Errors */
+
+        /* Metrics styling */
+        .metrics p { text-align: center; font-size: 0.9em; color: #555; margin-top: 10px; margin-bottom: 20px;}
+
+        /* Link and button styling */
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .back-link { display: block; text-align: center; margin-top: 30px; }
+        .download-button {
+            display: block;
+            width: fit-content;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+         .download-button:hover {
+            background-color: #0056b3;
+         }
+         .error-message {
+            text-align: center;
+            color: red;
+            margin-top: 20px;
+            font-weight: bold;
+         }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Media Processing Results</h1>
+
+        <div class="status-container
+            {% if 'CRITICAL RISK' in prediction_status %} status-critical
+            {% elif 'Critical Density Cell Detected' in prediction_status %} status-critical /* Treat single critical cell same as critical risk for visual status */
+            {% elif 'Warning' in prediction_status %} status-warning
+            {% elif 'Detected' in prediction_status %} status-detected /* Treat single high density cell same as detected */
+            {% elif 'Error' in prediction_status %} status-critical /* Style errors critically */
+            {% else %} status-normal
+            {% endif %}
+        " id="status-container"> <h2>Overall Risk Status: {{ prediction_status | default('Analysis Incomplete') }}</h2>
+             <input type="hidden" id="prediction-status" value="{{ prediction_status | default('') }}">
+        </div>
+
+        {% if processed_media_url %}
+            {% if output_media_type == 'video' %}
+                <h2>Most Critical Frame from Video Analysis</h2>
+                <img src="{{ processed_media_url }}" alt="Critical Frame from Video Analysis">
+                <p style="text-align:center; font-size:0.9em; color:#666;">(Analysis derived from the entire video)</p>
+
+                {% if download_video_url %}
+                    <a href="{{ download_video_url }}" download class="download-button">Download Full Processed Video</a>
+                {% else %}
+                    <p class="error-message">Note: Full processed video file was not successfully generated.</p>
+                {% endif %}
+
+            {% elif output_media_type == 'image' %}
+                <h2>Processed Image</h2>
+                <img src="{{ processed_media_url }}" alt="Processed Image">
+                {% else %}
+                 <p class="error-message">Unknown media type processed, but an output image is available.</p>
+                 <img src="{{ processed_media_url }}" alt="Processed Media">
+                 {% endif %}
+
+             <div class="metrics">
+                 <p>Max Persons Detected: {{ max_persons | default('N/A') }} | Processing Time: {{ processing_time | default('N/A') }} seconds</p>
+             </div>
+
+        {% else %}
+             <p class="error-message">Media processing failed or no output image could be generated.</p>
+             {% if 'Error' in prediction_status %}
+                 <p class="error-message" style="font-size:0.9em;">Details: {{ prediction_status }}</p>
+             {% endif %}
+        {% endif %}
+
+        <p class="back-link"><a href="/">Process another file or view live stream</a></p>
+
+    </div>
+
+    <audio id="criticalBeep" src="{{ url_for('static', filename='beep.mp3') }}" preload="auto"></audio>
+
+    <script>
+        // Get the status from the hidden input
+        const predictionStatus = document.getElementById('prediction-status').value;
+        const audioElement = document.getElementById('criticalBeep');
+
+        // Check if the status indicates a critical risk level
+        // Use includes() for flexibility with different critical status strings
+        if (predictionStatus.includes('CRITICAL RISK') || predictionStatus.includes('Critical Density Cell Detected')) {
+            // Attempt to play the sound
+            audioElement.play().catch(error => {
+                // Catch potential errors, e.g., browser autoplay policies blocking the sound.
+                console.warn('Autoplay prevented critical beep sound:', error);
+                // In a real application, you might inform the user they need to interact to enable sound.
+            });
+            // Optional: Loop the sound if you want it to continue beeping
+            // audioElement.loop = true;
+        }
+    </script>
+
+</body>
+</html>
