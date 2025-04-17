@@ -171,11 +171,11 @@ Ensure the topic name matches `FLUVIO_CROWD_TOPIC` in `app.py`.
    fluvio cluster start
    fluvio topic create crowd-data
    ```
-2. Run the Fluvio Consumer (optional):
+2. Run the Fluvio Consumer:
    ```bash
    python predict_stampede.py
    ```
-3. Start the Flask app:
+4. Start the Flask app (preferably in a new terminal):
    ```bash
    python app.py
    ```
