@@ -54,7 +54,7 @@ PERSON_CLASS_INDEX = 1
 DETECTION_THRESHOLD = 0.22 # Confidence threshold for detections
 
 # --- Density Analysis Settings ---
-HIGH_DENSITY_THRESHOLD = 7 # People count per cell to be considered 'High Density'
+HIGH_DENSITY_THRESHOLD = 6 # People count per cell to be considered 'High Density'
 CRITICAL_DENSITY_THRESHOLD = 9 # People count per cell to be considered 'Critical Density'
 HIGH_DENSITY_CELL_COUNT_THRESHOLD = 3 # Number of High Density cells to trigger 'High Density Warning'
 CRITICAL_DENSITY_CELL_COUNT_THRESHOLD = 2 # Number of Critical Density cells to trigger 'CRITICAL RISK'
