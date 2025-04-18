@@ -1,43 +1,317 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Stampede Prediction</title>
-    <style>
-        /* Your CSS styles */
-        body { font-family: sans-serif; margin: 40px; line-height: 1.6; }
-        h1 { text-align: center; color: #333; }
-        .container { max-width: 600px; margin: 20px auto; padding: 30px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }
-        form div { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type=file] { display: block; margin-bottom: 15px; }
-        input[type=submit], .live-link a {
-            background-color: #007bff; color: white; padding: 10px 20px; border: none;
-            border-radius: 5px; cursor: pointer; font-size: 1em; text-decoration: none; display: inline-block;
-        }
-        input[type=submit]:hover, .live-link a:hover { background-color: #0056b3; }
-        .live-link { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;}
-        .live-link a { background-color: #28a745; }
-        .live-link a:hover { background-color: #218838; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Stampede Prediction</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap');
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(to right, #f7f9fc, #dbeafe);
+      line-height: 1.6;
+    }
+
+    /* Navbar */
+    nav {
+      background-color: #0f172a;
+      color: white;
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    nav h2 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: 1px;
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 25px;
+    }
+
+    nav ul li a {
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      position: relative;
+      padding-bottom: 5px;
+      transition: color 0.3s;
+    }
+
+    nav ul li a::after {
+      content: "";
+      position: absolute;
+      width: 0;
+      height: 3px;
+      bottom: 0;
+      left: 0;
+      background: #38bdf8;
+      transition: width 0.3s ease-in-out;
+      border-radius: 2px;
+    }
+
+    nav ul li a:hover::after {
+      width: 100%;
+    }
+
+    nav ul li a:hover {
+      color: #38bdf8;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 40px;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+    }
+    .wait-message {
+  font-style: italic;
+  color: #6b7280; /* Grey color */
+  font-size: 0.7rem; /* Very small font size */
+  text-align: center; /* Center the text */
+  margin-top: 2px; /* Small space between the button and the text */
+  width: fit-content; /* Ensure the text width is adjusted to content */
+  margin-left: auto;
+  margin-right: auto; /* Center the text horizontally, so it aligns with the button */
+}
+
+
+    h1 {
+      text-align: center;
+      color: #0f172a;
+      margin-bottom: 30px;
+      font-size: 2rem;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    form div {
+      width: 100%;
+      text-align: center;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    input[type="file"] {
+      display: inline-block;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+    }
+
+    input[type="submit"] {
+      background-color: #3b82f6;
+      color: white;
+      padding: 12px 25px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    input[type="submit"]:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .live-link {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #ccc;
+    }
+
+    .live-link a {
+      background-color: #10b981;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      text-decoration: none;
+      display: inline-block;
+      transition: background-color 0.3s, transform 0.3s;
+      font-weight: 600;
+    }
+
+    .live-link a:hover {
+      background-color: #059669;
+      transform: scale(1.05);
+    }
+
+    .steps {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      margin-top: 40px;
+    }
+
+    .steps div {
+      width: 30%;
+      min-width: 220px;
+      background-color: #fff;
+      border-radius: 18px;
+      padding: 20px;
+      margin: 10px;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s, box-shadow 0.3s;
+      text-align: center;
+    }
+
+    .steps div:hover {
+      transform: scale(1.08);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    .steps h3 {
+      color: #1d4ed8;
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    .steps p {
+      color: #475569;
+      font-size: 0.95rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-top: 40px;
+    }
+
+    @media (max-width: 768px) {
+      .steps {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .steps div {
+        width: 90%;
+      }
+      
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>Stampede Risk Analysis</h1>
 
-        <form method="post" action="/upload_media" enctype="multipart/form-data">
-             <div>
-                 <label for="media">Upload Image or Video File:</label>
-                 <input type="file" id="media" name="media" accept="video/*,image/jpeg,image/png,image/gif" required>
-             </div>
-             <div>
-                 <input type="submit" value="Analyze Uploaded Media">
-             </div>
-        </form>
+  <!-- Navbar -->
+  <nav>
+    <h2>Stampede AI</h2>
+    <ul>
+      <li><a href="#">Home</a></li>
+      <li><a href="#how-it-works">How It Works</a></li>
+      <li><a href="#upload">Upload</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
 
-        <div class="live-link">
-             <label>Or View Live Analysis:</label>
-             <a href="/live">Start Live Webcam Feed</a>
-        </div>
+  <!-- Upload Container -->
+  <div class="container" id="upload">
+    <h1>Stampede Risk Analysis</h1>
+    <form method="post" action="/upload_media" enctype="multipart/form-data">
+      <div>
+        <label for="media">Upload Image or Video File:</label>
+        <input type="file" id="media" name="media" accept="video/*,image/jpeg,image/png,image/gif" required>
+      </div>
+      <div>
+        <input type="submit" value="Analyze Uploaded Media">
+      </div>
+      <p class="wait-message">Please wait a few minutes while the media gets processed.</p>
+    </form>
+    <div class="live-link">
+      <label>Or View Live Analysis:</label>
+      <a href="/live">Start Live Webcam Feed</a>
     </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="container" id="how-it-works">
+    <h1>How It Works</h1>
+    <div class="steps">
+      <div>
+        <h3>1. Upload</h3>
+        <p>Select an image or video of the crowd scene you want to analyze.</p>
+      </div>
+      <div>
+        <h3>2. Analyze</h3>
+        <p>Our AI processes the file and detects crowd density and movement.</p>
+      </div>
+      <div>
+        <h3>3. Result</h3>
+        <p>Risk zones are marked and displayed for awareness and safety action.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features Section -->
+  <div class="container" id="features">
+    <h1>Features</h1>
+    <div class="steps">
+      <div>
+        <h3>AI-Powered</h3>
+        <p>Uses deep learning models to detect and track crowd density in real time.</p>
+      </div>
+      <div>
+        <h3>Instant Alerts</h3>
+        <p>Highlights high-density zones with a red overlay and live visual feedback.</p>
+      </div>
+      <div>
+        <h3>Secure</h3>
+        <p>Designed with edge devices to avoid data leaks and ensure user privacy.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contact Section -->
+  <div class="container" id="contact">
+    <h1>Contact Us</h1>
+    <p style="text-align:center;">For queries or demo requests:<br><strong>@stampedeai.com</strong></p>
+  </div>
+
+  <footer style="background-color: #f8f9fa; padding: 20px 0; text-align: center; font-size: 0.9em; color: #555; border-top: 1px solid #ddd;">
+    <div>
+        <p>&copy; 2025 <span style="font-weight: 600;">Team Arete</span>. All rights reserved.</p>
+        <p style="font-size: 0.8em; color: #888;">Committed to excellence in innovation and design.</p>
+    </div>
+</footer>
+
 </body>
 </html>
+

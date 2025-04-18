@@ -1,23 +1,226 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Live Stampede Risk Feed</title>
-     <style>
-         body { font-family: sans-serif; margin: 20px; background-color: #f0f0f0; }
-         h1 { text-align: center; color: #333; }
-         img { display: block; margin: 20px auto; max-width: 90%; border: 2px solid #555; background-color: #fff;}
-         p { text-align: center; }
-         a { color: #007bff; }
-         a:hover { text-decoration: underline; }
-     </style>
+  <meta charset="UTF-8" />
+  <title>Live Stampede Risk Feed</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap');
+
+    :root {
+      --main-bg: linear-gradient(135deg, #f8fafc, #e0f2fe);
+      --primary-color: #3b82f6;
+      --primary-dark: #2563eb;
+      --text-dark: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--main-bg);
+      color: var(--text-dark);
+      animation: fadeIn 1s ease-in;
+      position: relative;
+      min-height: 100vh;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    header {
+      background-color: #0f172a;
+      color: white;
+      padding: 15px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transform: translateY(-100%);
+      animation: slideDown 0.7s forwards ease-out;
+    }
+
+    @keyframes slideDown {
+      to {
+        transform: translateY(0);
+      }
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      text-align: center;
+    }
+
+    hr {
+      margin: 10px auto 30px;
+      width: 60%;
+      border: 0;
+      height: 2px;
+      background: var(--primary-color);
+    }
+
+    .description {
+      text-align: center;
+      margin: 10px 20px;
+      color: #475569;
+      font-size: 1rem;
+    }
+
+    .status {
+      text-align: center;
+      font-weight: bold;
+      color: #16a34a;
+      margin-bottom: 10px;
+    }
+
+    .video-container {
+      display: flex;
+      justify-content: center;
+      margin: 40px auto;
+      max-width: 1000px;
+    }
+
+    .video-container img {
+      max-width: 100%;
+      border-radius: 16px;
+      padding: 5px;
+      background: linear-gradient(135deg, #3b82f6, #bfcee8);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+      animation: pulseBorder 3s infinite ease-in-out;
+      transition: transform 0.3s;
+    }
+
+    @keyframes pulseBorder {
+      0%, 100% { filter: hue-rotate(0deg); }
+      50% { filter: hue-rotate(30deg); }
+    }
+
+    .video-container img:hover {
+      transform: scale(1.03);
+    }
+
+    .back-link {
+      text-align: center;
+      margin: 30px 0 10px;
+    }
+
+    .back-link a {
+      background-color: var(--primary-color);
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: 0.3s ease;
+      box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .back-link a:hover {
+      background-color: var(--primary-dark);
+      transform: scale(1.05);
+    }
+
+    .note {
+      font-style: italic;
+      color: #6b7280;
+      font-size: 0.8rem;
+      text-align: center;
+      margin-top: 8px;
+      max-width: 300px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      background-color: #f1f5f9;
+      border-top: 1px solid #e2e8f0;
+      margin-top: 40px;
+    }
+
+    footer:hover {
+      color: #334155;
+    }
+
+    #topBtn {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      display: none;
+      background-color: var(--primary-dark);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 45px;
+      height: 45px;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+      z-index: 999;
+      transition: background 0.3s;
+    }
+
+    #topBtn:hover {
+      background-color: #1d4ed8;
+    }
+  </style>
 </head>
 <body>
+
+  <header>
     <h1>Live Webcam Analysis</h1>
-    <p>Displaying processed feed from your webcam. Risk assessment is overlaid.</p>
-    <p>If the feed doesn't start, check console logs and ensure camera permissions are granted.</p>
+  </header>
+
+  <hr>
+
+  <p class="description">Displaying processed feed from your webcam. Risk assessment is overlaid below.</p>
+  <p class="status">📡 Live Feed Active</p>
+  <p class="description">If the feed doesn't start, check console logs and ensure camera permissions are granted.</p>
+
+  <div class="video-container">
+    <img src="{{ url_for('video_feed_route') }}" width="800" alt="Live Video Feed" />
+  </div>
+
+  <div class="back-link">
+    <a href="a2.html">⬅ Back to Upload Page</a>
+  </div>
+
+  <p class="note">Please wait a few minutes while the media get processed...</p>
+
+  <footer style="background-color: #f8f9fa; padding: 20px 0; text-align: center; font-size: 0.9em; color: #555; border-top: 1px solid #ddd;">
     <div>
-        <img src="{{ url_for('video_feed_route') }}" width="800" alt="Live Video Feed">
-        </div>
-     <p><a href="/">Back to Upload Page</a></p>
+        <p>&copy; 2025 <span style="font-weight: 600;">Team Arete</span>. All rights reserved.</p>
+        <p style="font-size: 0.8em; color: #888;">Committed to excellence in innovation and design.</p>
+    </div>
+</footer>
+
+  <button onclick="scrollToTop()" id="topBtn" title="Go to top">↑</button>
+
+  <script>
+    const topBtn = document.getElementById("topBtn");
+    window.onscroll = function () {
+      if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+        topBtn.style.display = "block";
+      } else {
+        topBtn.style.display = "none";
+      }
+    };
+
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
 </body>
 </html>
+
+
