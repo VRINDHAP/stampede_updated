@@ -51,11 +51,11 @@ except Exception as e:
 
 # --- Model Specific Settings ---
 PERSON_CLASS_INDEX = 1
-DETECTION_THRESHOLD = 0.10 # Confidence threshold for detections
+DETECTION_THRESHOLD = 0.15 # Confidence threshold for detections
 
 # --- Density Analysis Settings ---
-HIGH_DENSITY_THRESHOLD = 5 # People count per cell to be considered 'High Density'
-CRITICAL_DENSITY_THRESHOLD = 7 # People count per cell to be considered 'Critical Density'
+HIGH_DENSITY_THRESHOLD = 6 # People count per cell to be considered 'High Density'
+CRITICAL_DENSITY_THRESHOLD = 8 # People count per cell to be considered 'Critical Density'
 HIGH_DENSITY_CELL_COUNT_THRESHOLD = 3 # Number of High Density cells to trigger 'High Density Warning'
 CRITICAL_DENSITY_CELL_COUNT_THRESHOLD = 2 # Number of Critical Density cells to trigger 'CRITICAL RISK'
 GRID_ROWS = 8
