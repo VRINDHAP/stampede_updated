@@ -4,120 +4,271 @@
   <meta charset="UTF-8" />
   <title>Live Stampede Risk Feed</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap');
-
+  <link rel="icon" href="{{ url_for('static', filename='StampedeAi_lcon.png') }}" type="image/png"> <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap'); /* */
     :root {
       --main-bg: linear-gradient(135deg, #f8fafc, #e0f2fe);
       --primary-color: #3b82f6;
       --primary-dark: #2563eb;
       --text-dark: #1e293b;
-      --text-muted: #64748b;
+      --text-muted: #64748b; /* */
       /* Status Colors */
-      --status-critical-bg: #f8d7da;
+      --status-critical-bg: #f8d7da; /* */
       --status-critical-fg: #721c24;
       --status-warning-bg: #fff3cd;
-      --status-warning-fg: #856404; /* Darker yellow for warning */
-      --status-detected-bg: #fff3cd; /* Same as warning bg */
-      --status-detected-fg: #c57d07; /* Orange/brown for detected */
-      --status-normal-bg: #d4edda;
+      --status-warning-fg: #856404; /* */
+      /* Darker yellow for warning */
+      --status-detected-bg: #fff3cd; /* */
+      /* Same as warning bg */
+      --status-detected-fg: #c57d07; /* */
+      /* Orange/brown for detected */
+      --status-normal-bg: #d4edda; /* */
       --status-normal-fg: #155724;
       --status-unknown-bg: #e2e3e5;
       --status-unknown-fg: #383d41;
-      --status-error-bg: var(--status-critical-bg);
+      --status-error-bg: var(--status-critical-bg); /* */
       --status-error-fg: var(--status-critical-fg);
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Poppins', sans-serif; background: var(--main-bg); color: var(--text-dark); animation: fadeIn 1s ease-in; position: relative; min-height: 100vh; padding-bottom: 80px; /* Footer height */ }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    * { box-sizing: border-box; margin: 0; padding: 0; } /* */
+    body {
+        font-family: 'Poppins', sans-serif;
+        background: var(--main-bg);
+        color: var(--text-dark); /* */
+        animation: fadeIn 1s ease-in; /* */
+        position: relative;
+        min-height: 100vh;
+        padding-bottom: 80px; /* */
+        /* Footer height */
+        overflow-x: hidden; /* */
+        /* Prevent horizontal scroll */
 
-    header { background-color: #0f172a; color: white; padding: 15px 20px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); animation: slideDown 0.7s forwards ease-out; transform: translateY(-100%); }
-    @keyframes slideDown { to { transform: translateY(0); } }
+        /* Add scroll padding for the sticky header */
+        scroll-padding-top: 70px; /* */
+        /* Adjust based on header height */
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } /* */
 
-    h1 { font-size: 1.8rem; text-align: center; }
-    hr { margin: 15px auto 25px; width: 50%; border: 0; height: 2px; background: var(--primary-color); }
+    header {
+        background-color: #0f172a; /* */
+        color: white;
+        padding: 15px 20px; /* Adjust padding if needed after adding logo */
+        position: sticky; /* */
+        top: 0;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        animation: slideDown 0.7s forwards ease-out;
+        transform: translateY(-100%); /* */
+        min-height: 60px; /* Ensure minimum height */
 
-    .description { text-align: center; margin: 0px 20px 15px; color: #475569; font-size: 0.95rem; }
-    .status-info { text-align: center; margin-bottom: 20px; }
+        /* Add flexbox for centering content inside header */
+        display: flex; /* */
+        justify-content: center; /* Center the header-content div */
+        align-items: center; /* */
+        /* Vertically center the header-content div */
+    }
+    @keyframes slideDown { to { transform: translateY(0); } } /* */
+
+    /* Add this CSS for the container inside the header */
+    .header-content {
+        display: flex; /* */
+        /* Use flexbox for items inside header */
+        align-items: center; /* */
+        /* Vertically center logo and heading */
+        gap: 15px; /* */
+        /* Space between logo and heading */
+    }
+
+    /* Add this CSS for the logo image inside the header */
+    .header-content img {
+        height: 40px; /* */
+        /* Adjust logo size as needed to fit well */
+        /* width: auto; Let the width adjust proportionally */ /* */
+    }
+
+    /* Ensure h1 color is white and remove default margin when inside flex */
+    header h1 {
+        color: white; /* */
+        margin: 0; /* Remove default margin */
+        font-size: 1.8rem; /* */
+        /* Keep original size */
+        font-weight: 600; /* */
+        /* Match font weight from index page */
+    }
+
+    hr { margin: 15px auto 25px; /* */
+        width: 50%; border: 0; height: 2px; background: var(--primary-color); }
+
+    .description { text-align: center; margin: 0px 20px 15px; /* */
+        color: #475569; font-size: 0.95rem; }
+    .status-info { text-align: center; margin-bottom: 20px; /* */
+    }
     .status-info h2 {
-        font-size: 1.2rem; /* Slightly smaller */
+        font-size: 1.2rem; /* */
+        /* Slightly smaller */
         margin-bottom: 8px;
-        padding: 6px 12px; /* Adjusted padding */
+        padding: 6px 12px; /* */
+        /* Adjusted padding */
         display: inline-block;
         border-radius: 6px;
         font-weight: 600;
-        min-width: 200px; /* Give some base width */
-        transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease; /* Smooth transitions */
-        border: 1px solid transparent; /* Base border */
+        min-width: 200px; /* */
+        /* Give some base width */
+        transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease; /* */
+        /* Smooth transitions */
+        border: 1px solid transparent; /* */
+        /* Base border */
     }
     .status-info h2#persons-heading {
-         font-size: 1.1rem; /* Smaller for person count */
-         font-weight: 500;
-         background-color: #e9ecef; /* Neutral background */
-         color: #495057;
-         border: 1px solid #ced4da;
+          font-size: 1.1rem; /* */
+          /* Smaller for person count */
+          font-weight: 500;
+          background-color: #e9ecef; /* */
+          /* Neutral background */
+          color: #495057;
+          border: 1px solid #ced4da; /* */
+          margin-left: 10px; /* Add space between the two status boxes */
     }
 
     /* Status color classes */
-    .status-critical { background-color: var(--status-critical-bg); color: var(--status-critical-fg); border-color: var(--status-critical-fg);}
-    .status-warning { background-color: var(--status-warning-bg); color: var(--status-warning-fg); border-color: var(--status-warning-fg);}
-    .status-detected { background-color: var(--status-detected-bg); color: var(--status-detected-fg); border-color: var(--status-detected-fg);}
-    .status-normal { background-color: var(--status-normal-bg); color: var(--status-normal-fg); border-color: var(--status-normal-fg);}
-    .status-unknown { background-color: var(--status-unknown-bg); color: var(--status-unknown-fg); border-color: var(--status-unknown-fg);}
-    .status-error { background-color: var(--status-error-bg); color: var(--status-error-fg); border-color: var(--status-error-fg);}
+    .status-critical { background-color: var(--status-critical-bg); color: var(--status-critical-fg); border-color: var(--status-critical-fg);} /* */
+    .status-warning { background-color: var(--status-warning-bg); color: var(--status-warning-fg); border-color: var(--status-warning-fg);} /* */
+    .status-detected { background-color: var(--status-detected-bg); color: var(--status-detected-fg); border-color: var(--status-detected-fg);} /* */
+    .status-normal { background-color: var(--status-normal-bg); color: var(--status-normal-fg); border-color: var(--status-normal-fg);} /* */
+    .status-unknown { background-color: var(--status-unknown-bg); color: var(--status-unknown-fg); border-color: var(--status-unknown-fg);} /* */
+    .status-error { background-color: var(--status-error-bg); color: var(--status-error-fg); border-color: var(--status-error-fg);} /* */
 
-
-    .video-container { display: flex; justify-content: center; margin: 30px auto; max-width: 90%; width: 800px; }
-    .video-container img {
-        max-width: 100%; border-radius: 12px;
-        padding: 4px; background: linear-gradient(135deg, #a8c0ff, #3f2b96);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); animation: pulseBorder 3s infinite ease-in-out;
-        transition: transform 0.3s; display: block;
+    /* Elegant Camera Selector Style */
+    .camera-select-container {
+      text-align: center;
+      /* MOVED: margin: 15px auto 25px; */ /* Remove top/bottom margins here */
+      margin-left: auto; /* Center horizontally */
+      margin-right: auto;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.6); /* Slightly transparent background */
+      border-radius: 8px;
+      display: inline-block; /* Fit content width */
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      max-width: 90%;
+      width: fit-content; /* Let it size based on content */
     }
-    @keyframes pulseBorder { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.1); } }
-    .video-container img:hover { transform: scale(1.02); }
+    .camera-select-wrapper { /* Added wrapper for positioning */
+        text-align: center; /* Center the container */
+        margin-top: 25px; /* Add space above the selector */
+        margin-bottom: 15px; /* Add space below the selector */
+    }
+    .camera-select-container label {
+      margin-right: 10px;
+      font-weight: 600;
+      color: var(--text-dark);
+      vertical-align: middle;
+    }
+    #cameraSelect {
+      padding: 8px 12px; /* More padding */
+      border-radius: 6px; /* Rounded corners */
+      border: 1px solid #ccc;
+      background-color: #fff; /* White background */
+      font-size: 0.95rem; /* Match description font size */
+      cursor: pointer;
+      transition: border-color 0.3s, box-shadow 0.3s;
+      vertical-align: middle;
+      min-width: 180px; /* Minimum width */
+    }
+    #cameraSelect:hover {
+      border-color: var(--primary-color);
+    }
+    #cameraSelect:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); /* Focus ring */
+    }
 
-    .back-link { text-align: center; margin: 25px 0 10px; }
-    .back-link a { background-color: var(--primary-color); color: white; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: 0.3s ease; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); }
-    .back-link a:hover { background-color: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4); }
+    .video-container { display: flex; justify-content: center; margin: 30px auto; max-width: 90%; width: 800px; } /* */
+    .video-container img {
+        max-width: 100%; /* */
+        border-radius: 12px;
+        padding: 4px; background: linear-gradient(135deg, #a8c0ff, #3f2b96);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2); /* */
+        animation: pulseBorder 3s infinite ease-in-out;
+        transition: transform 0.3s; display: block; /* */
+    }
+    @keyframes pulseBorder { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.1); } } /* */
+    .video-container img:hover { transform: scale(1.02); } /* */
 
-    .note { font-style: italic; color: #6b7280; font-size: 0.8rem; text-align: center; margin-top: 8px; max-width: 400px; margin-left: auto; margin-right: auto; }
+    .back-link { text-align: center; margin: 25px 0 10px; } /* */ /* Adjusted top margin */
+    .back-link a { background-color: var(--primary-color); color: white; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: 0.3s ease; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3); } /* */
+    .back-link a:hover { background-color: var(--primary-dark); transform: translateY(-2px); box-shadow: 0 6px 12px rgba(59, 130, 246, 0.4); } /* */
 
-    footer { text-align: center; padding: 15px; font-size: 0.9rem; color: var(--text-muted); background-color: #f1f5f9; border-top: 1px solid #e2e8f0; position: absolute; bottom: 0; width: 100%; }
-    footer:hover { color: #334155; }
+    .note { font-style: italic; color: #6b7280; font-size: 0.8rem; text-align: center; margin-top: 8px; max-width: 400px; margin-left: auto; margin-right: auto; } /* */
 
-    #topBtn { position: fixed; bottom: 20px; right: 20px; display: none; background-color: var(--primary-dark); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25); z-index: 999; transition: background 0.3s, transform 0.2s; }
-    #topBtn:hover { background-color: #1d4ed8; transform: scale(1.1); }
+    footer { text-align: center; padding: 15px; font-size: 0.9rem; color: var(--text-muted); background-color: #f1f5f9; border-top: 1px solid #e2e8f0; position: absolute; bottom: 0; width: 100%; } /* */
+    footer:hover { color: #334155; } /* */
 
-     @media (max-width: 768px) {
-        h1 { font-size: 1.5rem; }
-        .video-container { width: 95%; margin: 20px auto; }
-        .status-info h2 { font-size: 1.0rem; min-width: 180px; } /* Adjust size */
-        body { padding-bottom: 100px; } /* Adjust footer space */
-     }
+    #topBtn { position: fixed; bottom: 20px; right: 20px; display: none; background-color: var(--primary-dark); color: white; border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25); z-index: 999; transition: background 0.3s, transform 0.2s; } /* */
+    #topBtn:hover { background-color: #1d4ed8; transform: scale(1.1); } /* */
+
+    @media (max-width: 768px) {
+        /* Adjust mobile scroll padding */
+       body {
+           scroll-padding-top: 60px; /* */
+           /* Adjust based on mobile header height */
+       }
+       /* Ensure footer padding is still adequate */
+       body { padding-bottom: 100px; } /* */
+
+       header {
+           padding: 10px 15px; /* */
+           /* Smaller padding on mobile */
+           min-height: 50px; /* */
+           /* Adjust min-height */
+       }
+       .header-content img {
+           height: 30px; /* */
+           /* Slightly smaller logo on mobile */
+           gap: 8px; /* */
+        }
+       header h1 {
+           font-size: 1.3rem; /* */
+           /* Smaller heading on mobile */
+       }
+
+       h1 { font-size: 1.5rem; } /* */
+       .video-container { width: 95%; margin: 20px auto; } /* */
+       .status-info h2 { font-size: 1.0rem; min-width: 150px; padding: 5px 10px;} /* Adjust size and padding */ /* */
+       .status-info h2#persons-heading { margin-left: 5px;} /* Adjust space */ /* */
+       .camera-select-container { display: block; margin-left: auto; margin-right: auto; } /* Center container on mobile */
+       #cameraSelect { font-size: 0.9rem; padding: 6px 10px; min-width: 160px;} /* Adjust select size */
+       .camera-select-wrapper { margin-top: 20px; margin-bottom: 10px; } /* Adjust spacing on mobile */
+    }
 
   </style>
 </head>
 <body>
 
   <header>
-    <h1>Live Webcam Analysis</h1>
+     <div class="header-content">
+        <img src="{{ url_for('static', filename='StampedeAi_Logo.png') }}" alt="Stampede AI Logo"> <h1>Live Webcam Analysis</h1>
+    </div>
   </header>
 
   <hr>
 
-  <p class="description">Displaying processed feed from webcam/video. Risk status and person count are updated below.</p>
-  <p class="description" id="connection-status" style="font-weight: bold; color: var(--text-muted);">Connecting to status updates...</p>
-
-  <div class="status-info">
+  <p class="description">Displaying processed feed from the selected source. Risk status and person count are updated below.</p> <p class="description" id="connection-status" style="font-weight: bold; color: var(--text-muted);">Connecting to status updates...</p> <div class="status-info">
       <h2 id="stampede-chance-heading" class="status-unknown">Stampede Chance: Initializing...</h2>
       <h2 id="persons-heading">Detected Persons: N/A</h2>
   </div>
 
-
   <div class="video-container">
-    <img id="live-video-feed" src="{{ url_for('video_feed_route') }}" alt="Live Video Feed - Loading..." />
+    <img id="live-video-feed" src="" alt="Live Video Feed - Loading..." /> </div>
+
+  <div class="camera-select-wrapper"> <div class="camera-select-container">
+        <label for="cameraSelect">Select Camera:</label>
+        <select id="cameraSelect">
+            <option value="0">Default Camera (0)</option>
+            <option value="1">Camera 1</option>
+            <option value="2">Camera 2</option>
+            <option value="3">Camera 3</option> </select>
+      </div>
   </div>
 
   <div class="back-link">
@@ -126,133 +277,160 @@
 
   <footer style="background-color: #f8f9fa; padding: 15px 0; text-align: center; font-size: 0.9em; color: #555; border-top: 1px solid #ddd;">
     <div>
-        <p>&copy; 2025 <span style="font-weight: 600;">Team Arete</span>. All rights reserved.</p>
-        <p style="font-size: 0.8em; color: #888;">Stampede Prediction Project - YOLOv8</p>
-    </div>
-</footer>
+        <p>&copy; 2025 <span style="font-weight: 600;">Team Arete</span>. All rights reserved.</p> <p style="font-size: 0.8em; color: #888;">Stampede Prediction Project</p> </div>
+  </footer>
 
   <button onclick="scrollToTop()" id="topBtn" title="Go to top">↑</button>
 
   <script>
     // --- Scroll-to-top Button Logic ---
-    const topBtn = document.getElementById("topBtn");
+    const topBtn = document.getElementById("topBtn"); //
     window.onscroll = function () {
       if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
-        topBtn.style.display = "block";
+        topBtn.style.display = "block"; //
       } else {
-        topBtn.style.display = "none";
+        topBtn.style.display = "none"; //
       }
     };
-    function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    function scrollToTop() { //
+      window.scrollTo({ top: 0, behavior: 'smooth' }); //
     }
 
+    // --- Camera Selection and Video Feed Update ---
+    const cameraSelect = document.getElementById('cameraSelect');
+    const videoFeed = document.getElementById('live-video-feed'); //
+    const chanceHeading = document.getElementById('stampede-chance-heading'); //
+    const personsHeading = document.getElementById('persons-heading'); //
+    const connectionStatus = document.getElementById('connection-status'); //
+
+    function updateVideoStream() {
+        const selectedIndex = cameraSelect.value;
+        console.log(`Camera selected: index ${selectedIndex}`);
+        // Update the image source with the selected camera index as a query parameter
+        const feedUrl = `{{ url_for('video_feed_route') }}?camera=${selectedIndex}`; //
+        videoFeed.src = feedUrl;
+        videoFeed.alt = `Live Video Feed - Camera ${selectedIndex}`;
+
+        // Reset status display when camera changes
+        chanceHeading.textContent = 'Stampede Chance: Initializing...';
+        chanceHeading.className = 'status-unknown'; //
+        personsHeading.textContent = 'Detected Persons: N/A'; //
+        connectionStatus.textContent = "Connecting to status updates..."; //
+        connectionStatus.style.color = "var(--text-muted)"; //
+    }
+
+    // Add event listener to the select dropdown
+    cameraSelect.addEventListener('change', updateVideoStream);
+
+    // Initial load: Set the video stream source based on the default selection
+    document.addEventListener('DOMContentLoaded', () => {
+        updateVideoStream(); // Load default stream on page load
+    });
+
+    // Add error handler for the video feed image itself
+    videoFeed.onerror = function() {
+        console.error("Video feed failed to load for index:", cameraSelect.value);
+        connectionStatus.textContent = `Video Feed Failed (Camera ${cameraSelect.value})`; //
+        connectionStatus.style.color = "var(--status-error-fg)"; //
+        videoFeed.alt = `Video feed failed for Camera ${cameraSelect.value}. Is it connected and accessible?`;
+        // videoFeed.src = "{{ url_for('static', filename='placeholder_error.png') }}"; // Optional placeholder
+    };
+
     // --- Server-Sent Events (SSE) for Live Status Updates ---
-    const chanceHeading = document.getElementById('stampede-chance-heading');
-    const personsHeading = document.getElementById('persons-heading');
-    const connectionStatus = document.getElementById('connection-status');
-    const videoFeed = document.getElementById('live-video-feed'); // Get video feed img element
-
-    console.log("Initializing SSE connection...");
-
+    console.log("Initializing SSE connection..."); //
     // Check if EventSource is supported
-    if (typeof(EventSource) !== "undefined") {
+    if (typeof(EventSource) !== "undefined") { //
       // Create an EventSource object pointing to the Flask SSE route
-      const eventSource = new EventSource("{{ url_for('stream_status_route') }}");
+      const eventSource = new EventSource("{{ url_for('stream_status_route') }}"); //
 
-      eventSource.onopen = function() {
+      eventSource.onopen = function() { //
         console.log("SSE connection established.");
-        connectionStatus.textContent = "Live Status Connected";
-        connectionStatus.style.color = "var(--status-normal-fg)"; // Green text
+        // Only update connection status text if it hasn't failed due to video feed error
+        if (!connectionStatus.textContent.startsWith("Video Feed Failed")) {
+            connectionStatus.textContent = "Live Status Connected"; //
+            connectionStatus.style.color = "var(--status-normal-fg)"; // Green text
+        }
       };
 
       // Handle messages received from the server
-      eventSource.onmessage = function(event) {
+      eventSource.onmessage = function(event) { //
         // console.log("SSE Data Received:", event.data); // Debug log
         try {
-          const data = JSON.parse(event.data);
-
+          const data = JSON.parse(event.data); //
           // Update Stampede Chance Heading Text and Style
-          let chanceText = "Stampede Chance: Unknown";
+          let chanceText = "Stampede Chance: Unknown"; //
           let chanceClass = "status-unknown"; // Default CSS class
 
           if (data.status) {
-              const status = data.status; // e.g., "CRITICAL RISK", "Normal", "Error:..."
+              const status = data.status; //
+              // e.g., "CRITICAL RISK", "Normal", "Error:..."
               if (status.includes("CRITICAL")) {
-                  chanceText = `Stampede Chance: Critical`;
-                  chanceClass = "status-critical";
+                  chanceText = `Stampede Chance: Critical`; //
+                  chanceClass = "status-critical"; //
               } else if (status.includes("Warning")) {
-                  chanceText = `Stampede Chance: High`;
-                  chanceClass = "status-warning";
+                  chanceText = `Stampede Chance: High`; //
+                  chanceClass = "status-warning"; //
               } else if (status.includes("Detected")) {
                   chanceText = `Stampede Chance: Moderate`; // Changed from High for clarity
-                  chanceClass = "status-detected";
-              } else if (status === "Normal") {
-                  chanceText = "Stampede Chance: Low";
-                  chanceClass = "status-normal";
+                  chanceClass = "status-detected"; //
+              } else if (status === "Normal") { //
+                  chanceText = "Stampede Chance: Low"; //
+                  chanceClass = "status-normal"; //
               } else if (status.includes("Error") || status.includes("Incomplete")) {
                   chanceText = `Status: ${status}`; // Show the specific error/status
-                  chanceClass = "status-error";
+                  chanceClass = "status-error"; //
               } else {
                    chanceText = `Status: ${status}`; // Catch other statuses
-                   chanceClass = "status-unknown";
+                   chanceClass = "status-unknown"; //
               }
           }
-          chanceHeading.textContent = chanceText;
+          chanceHeading.textContent = chanceText; //
           // Update the class for styling (remove old status, add new one)
-          chanceHeading.className = ''; // Clear existing classes first
-          chanceHeading.classList.add(chanceClass);
-
-
+          chanceHeading.className = ''; //
+          // Clear existing classes first
+          chanceHeading.classList.add(chanceClass); //
           // Update Persons Heading Text
-          if (data.persons !== undefined && data.persons !== null) {
-              personsHeading.textContent = `Detected Persons: ${data.persons}`;
+          if (data.persons !== undefined && data.persons !== null) { //
+              personsHeading.textContent = `Detected Persons: ${data.persons}`; //
           } else {
-              personsHeading.textContent = `Detected Persons: N/A`;
+              personsHeading.textContent = `Detected Persons: N/A`; //
           }
 
         } catch (e) {
-          console.error("Error parsing SSE data:", e);
+          console.error("Error parsing SSE data:", e); //
           chanceHeading.textContent = "Status Update Error";
-          chanceHeading.className = 'status-error';
-          personsHeading.textContent = "Persons: Error";
+          chanceHeading.className = 'status-error'; //
+          personsHeading.textContent = "Persons: Error"; //
         }
       };
 
       // Handle errors with the SSE connection
-      eventSource.onerror = function(err) {
-        console.error("SSE Connection Error:", err);
+      eventSource.onerror = function(err) { //
+        console.error("SSE Connection Error:", err); //
         chanceHeading.textContent = "Status Connection Lost";
-        chanceHeading.className = 'status-error';
-        personsHeading.textContent = "Persons: N/A";
-        connectionStatus.textContent = "Status Connection Failed";
-        connectionStatus.style.color = "var(--status-error-fg)"; // Red text
+        chanceHeading.className = 'status-error'; //
+        personsHeading.textContent = "Persons: N/A"; //
+        // Update connection status only if it wasn't already a video error
+        if (!connectionStatus.textContent.startsWith("Video Feed Failed")) {
+            connectionStatus.textContent = "Status Connection Failed"; //
+            connectionStatus.style.color = "var(--status-error-fg)"; // Red text
+        }
 
         // Optionally close the connection and maybe try to reconnect after a delay
-        eventSource.close();
+        eventSource.close(); //
         console.log("SSE connection closed due to error.");
         // Add reconnection logic here if desired
       };
 
     } else {
       // Browser doesn't support EventSource
-      console.error("SSE not supported by this browser.");
-      chanceHeading.textContent = "Live Updates Not Supported";
-      chanceHeading.className = 'status-error';
-      personsHeading.textContent = "Persons: N/A";
-      connectionStatus.textContent = "Browser does not support live updates.";
-      connectionStatus.style.color = "var(--status-error-fg)";
+      console.error("SSE not supported by this browser."); //
+      chanceHeading.textContent = "Live Updates Not Supported"; //
+      chanceHeading.className = 'status-error'; //
+      personsHeading.textContent = "Persons: N/A"; //
+      connectionStatus.textContent = "Browser does not support live updates."; //
+      connectionStatus.style.color = "var(--status-error-fg)"; //
     }
-
-    // Add error handler for the video feed image itself
-    videoFeed.onerror = function() {
-        console.error("Video feed failed to load.");
-        connectionStatus.textContent = "Video Feed Failed to Load";
-        connectionStatus.style.color = "var(--status-error-fg)";
-        // Optionally display a placeholder image or message
-        // videoFeed.alt = "Video feed failed.";
-        // videoFeed.src = "path/to/placeholder_error_image.png";
-    };
 
   </script>
 </body>

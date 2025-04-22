@@ -1,286 +1,612 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en" style="scroll-padding-top: 80px;"> <head>
   <meta charset="UTF-8">
   <title>Stampede Prediction</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap');
+  <link rel="icon" href="{{ url_for('static', filename='StampedeAi_lcon.png') }}" type="image/png"> <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+
+    :root {
+      --primary-dark: #0f172a;
+      --primary-blue: #3b82f6;
+      --secondary-green: #10b981;
+      --highlight-blue: #38bdf8; /* [cite: 107] */
+      --text-dark: #1e293b; /* [cite: 108] */
+      --text-grey: #475569;
+      --bg-light: #f7f9fc;
+      --bg-gradient-start: #f7f9fc;
+      --bg-gradient-end: #dbeafe;
+      --white: #ffffff;
+      --border-grey: #ccc;
+      --shadow-light: rgba(0, 0, 0, 0.1); /* [cite: 108] */
+      --shadow-medium: rgba(0, 0, 0, 0.2); /* [cite: 109] */
+      --error-red: #ef4444;
+      --success-green: #22c55e;
+    }
 
     * {
-      box-sizing: border-box;
+      box-sizing: border-box; /* [cite: 109] */
       margin: 0;
-      padding: 0;
+      padding: 0; /* [cite: 110] */
     }
 
     html {
-      scroll-behavior: smooth;
+      scroll-behavior: smooth; /* [cite: 110] */
+      /* Increased padding to accommodate larger logo */
+      scroll-padding-top: 80px; /* [cite: 111] */
     }
 
     body {
       font-family: 'Poppins', sans-serif;
-      background: linear-gradient(to right, #f7f9fc, #dbeafe);
-      line-height: 1.6;
+      background: linear-gradient(to right, var(--bg-gradient-start), var(--bg-gradient-end)); /* [cite: 112] */
+      line-height: 1.6; /* [cite: 113] */
+      color: var(--text-grey);
+      overflow-x: hidden; /* Prevent horizontal scroll on mobile menu */
     }
 
     /* Navbar */
     nav {
-      background-color: #0f172a;
-      color: white;
+      background-color: var(--primary-dark); /* [cite: 113] */
+      color: var(--white);
       padding: 15px 30px;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-      position: sticky;
+      align-items: center; /* [cite: 114] */
+      /* Vertically center items in the nav */
+      box-shadow: 0 4px 10px var(--shadow-medium);
+      position: sticky; /* [cite: 115] */
       top: 0;
       z-index: 100;
+      min-height: 60px; /* Ensure minimum height */
     }
 
+    /* Logo and Text Container */
+    .logo-container {
+      display: flex; /* [cite: 117] */
+      /* Use flexbox to align items horizontally */
+      align-items: center; /* [cite: 117] */
+      /* Vertically centers the logo and text */
+      gap: 10px; /* [cite: 119] */
+      /* Adds space between the image and the h2 text */
+      z-index: 101; /* [cite: 119] */
+      /* Ensure it's above the mobile menu overlay */
+    }
+
+    .logo-container img {
+      height: 50px; /* [cite: 121] */
+      /* width: auto; */ /* Allows the width to scale proportionally */ /* [cite: 122] */
+    }
+
+     /* Adjust the h2 rule if needed, though inheriting from nav is usually fine */
     nav h2 {
-      margin: 0;
+      margin: 0; /* [cite: 123] */
+      /* Reset margin */
       font-size: 1.5rem;
       letter-spacing: 1px;
+      font-weight: 600;
+      color: var(--white); /* [cite: 124] */
+      /* Ensure color is white */
     }
 
+
     nav ul {
-      list-style: none;
+      list-style: none; /* [cite: 125] */
       display: flex;
       gap: 25px;
+      margin: 0; /* Reset default margin */
+      padding: 0; /* [cite: 126] */
+      /* Reset default padding */
     }
 
     nav ul li a {
-      color: white;
+      color: var(--white); /* [cite: 127] */
       text-decoration: none;
       font-weight: 500;
       position: relative;
       padding-bottom: 5px;
-      transition: color 0.3s;
+      transition: color 0.3s; /* [cite: 128] */
     }
 
     nav ul li a::after {
       content: "";
       position: absolute;
-      width: 0;
+      width: 0; /* [cite: 129] */
       height: 3px;
       bottom: 0;
       left: 0;
-      background: #38bdf8;
+      background: var(--highlight-blue);
       transition: width 0.3s ease-in-out;
-      border-radius: 2px;
+      border-radius: 2px; /* [cite: 130] */
     }
 
     nav ul li a:hover::after {
-      width: 100%;
+      width: 100%; /* [cite: 131] */
     }
 
     nav ul li a:hover {
-      color: #38bdf8;
+      color: var(--highlight-blue); /* [cite: 132] */
     }
+
+    /* Hamburger Menu Icon */
+    .hamburger {
+      display: none; /* [cite: 133] */
+      /* Hidden by default on larger screens */
+      flex-direction: column;
+      cursor: pointer;
+      gap: 5px; /* [cite: 134] */
+      z-index: 101; /* Keep icon above mobile menu overlay */
+    }
+
+    .hamburger .line {
+      width: 25px; /* [cite: 135] */
+      height: 3px;
+      background-color: var(--white);
+      transition: all 0.3s ease-in-out;
+      border-radius: 2px; /* [cite: 136] */
+    }
+
+    /* Mobile Menu State */
+    body.nav-open nav ul {
+      transform: translateX(0); /* [cite: 137] */
+    }
+
+    body.nav-open .hamburger .line:nth-child(1) {
+      transform: translateY(8px) rotate(45deg); /* [cite: 138] */
+    }
+
+    body.nav-open .hamburger .line:nth-child(2) {
+      opacity: 0; /* [cite: 139] */
+    }
+
+    body.nav-open .hamburger .line:nth-child(3) {
+      transform: translateY(-8px) rotate(-45deg); /* [cite: 140] */
+    }
+
 
     .container {
       max-width: 700px;
       margin: 40px auto;
-      padding: 40px;
+      padding: 40px; /* [cite: 141] */
       background: rgba(255, 255, 255, 0.85);
       border-radius: 20px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 24px var(--shadow-light);
+      backdrop-filter: blur(10px); /* [cite: 142] */
     }
-    .wait-message {
-  font-style: italic;
-  color: #6b7280; /* Grey color */
-  font-size: 0.7rem; /* Very small font size */
-  text-align: center; /* Center the text */
-  margin-top: 2px; /* Small space between the button and the text */
-  width: fit-content; /* Ensure the text width is adjusted to content */
-  margin-left: auto;
-  margin-right: auto; /* Center the text horizontally, so it aligns with the button */
-}
-
 
     h1 {
       text-align: center;
-      color: #0f172a;
+      color: var(--primary-dark);
       margin-bottom: 30px;
-      font-size: 2rem;
+      font-size: 2rem; /* [cite: 143] */
+      font-weight: 700;
     }
 
+    /* Form Styling */
     form {
-      display: flex;
+      display: flex; /* [cite: 144] */
       flex-direction: column;
       align-items: center;
       gap: 20px;
+      margin-top: 30px;
+      padding-top: 30px;
+      border-top: 1px solid var(--border-grey); /* [cite: 145] */
     }
 
     form div {
       width: 100%;
-      text-align: center;
+      text-align: center; /* [cite: 146] */
     }
 
     label {
       display: block;
       margin-bottom: 8px;
       font-weight: 600;
-      color: #1e293b;
+      color: var(--text-dark); /* [cite: 147] */
     }
 
-    input[type="file"] {
-      display: inline-block;
-      padding: 10px;
+    /* Custom File Input Styling */
+    .file-input-wrapper {
+      display: inline-block; /* [cite: 148] */
+      cursor: pointer;
+      background-color: var(--bg-light);
+      color: var(--text-grey);
+      padding: 10px 15px;
+      border: 1px solid var(--border-grey);
       border-radius: 10px;
-      border: 1px solid #ccc;
+      transition: background-color 0.3s, border-color 0.3s; /* [cite: 149] */
     }
+
+    .file-input-wrapper:hover {
+        background-color: #e0e7ff; /* [cite: 150] */
+        /* Lighter shade of background */
+        border-color: var(--primary-blue);
+        color: var(--text-dark); /* [cite: 151] */
+    }
+
+    .file-input-wrapper input[type="file"] {
+      display: none; /* [cite: 152] */
+      /* Hide the actual file input */
+    }
+
+    .file-name {
+        margin-top: 8px; /* [cite: 153] */
+        font-size: 0.9em;
+        color: var(--text-dark);
+        font-weight: 400;
+    }
+
 
     input[type="submit"] {
-      background-color: #3b82f6;
-      color: white;
+      background-color: var(--primary-blue); /* [cite: 154] */
+      color: var(--white);
       padding: 12px 25px;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       font-size: 1rem;
-      transition: transform 0.3s, box-shadow 0.3s;
+      transition: transform 0.3s, box-shadow 0.3s, opacity 0.3s; /* [cite: 155] */
+      font-weight: 600;
     }
 
-    input[type="submit"]:hover {
+    input[type="submit"]:hover:not(:disabled) {
       transform: scale(1.05);
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 6px 20px var(--shadow-light); /* [cite: 156] */
     }
+
+    input[type="submit"]:disabled {
+        background-color: #9ca3af; /* [cite: 157] */
+        /* Grey out when disabled */
+        cursor: not-allowed;
+        opacity: 0.7; /* [cite: 158] */
+    }
+
+    /* Loading State */
+    .loading-state, .results-area, .error-message {
+        display: none; /* [cite: 159] */
+        /* Hidden by default */
+        text-align: center;
+        margin-top: 20px;
+        padding: 20px;
+        border-radius: 10px; /* [cite: 160] */
+    }
+
+    .loading-state {
+        background-color: #e0f2fe; /* [cite: 161] */
+        /* Light blue background */
+        color: var(--primary-blue);
+        font-weight: 600; /* [cite: 162] */
+    }
+
+    .loading-state .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1); /* [cite: 163] */
+        border-top: 4px solid var(--primary-blue);
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px auto; /* [cite: 164] */
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); } /* [cite: 165] */
+        100% { transform: rotate(360deg); } /* [cite: 166] */
+    }
+
+    .results-area {
+        background-color: #d1fae5; /* [cite: 167] */
+        /* Light green background */
+        border: 1px solid var(--secondary-green);
+        color: var(--success-green);
+        font-weight: 600; /* [cite: 168] */
+    }
+
+     .results-area img, .results-area video {
+         max-width: 100%; /* [cite: 169] */
+         height: auto;
+         margin-top: 15px;
+         border-radius: 8px;
+         box-shadow: 0 4px 8px var(--shadow-light); /* [cite: 170] */
+     }
+
+
+    .error-message {
+        background-color: #fee2e2; /* [cite: 171] */
+        /* Light red background */
+        border: 1px solid var(--error-red);
+        color: var(--error-red);
+        font-weight: 600; /* [cite: 172] */
+    }
+
+
+    .wait-message {
+      font-style: italic;
+      color: var(--text-grey);
+      font-size: 0.7rem;
+      text-align: center; /* [cite: 173] */
+      margin-top: 5px; /* Adjusted spacing */
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto; /* [cite: 174] */
+    }
+
 
     .live-link {
       text-align: center;
-      margin-top: 40px;
-      padding-top: 20px;
-      border-top: 1px solid #ccc;
+      margin-bottom: 30px; /* [cite: 175] */
+    }
+
+    .live-link label {
+        margin-bottom: 15px; /* [cite: 176] */
+        /* More space below label */
     }
 
     .live-link a {
-      background-color: #10b981;
-      color: white;
+      background-color: var(--secondary-green); /* [cite: 177] */
+      color: var(--white);
       padding: 12px 20px;
       border-radius: 10px;
       text-decoration: none;
       display: inline-block;
-      transition: background-color 0.3s, transform 0.3s;
-      font-weight: 600;
+      transition: background-color 0.3s, transform 0.3s, box-shadow 0.3s;
+      font-weight: 600; /* [cite: 178] */
     }
 
     .live-link a:hover {
-      background-color: #059669;
+      background-color: #059669; /* [cite: 179] */
+      /* Darker green */
       transform: scale(1.05);
+      box-shadow: 0 4px 12px var(--shadow-light); /* [cite: 180] */
     }
 
     .steps {
       display: flex;
       justify-content: space-around;
       flex-wrap: wrap;
-      margin-top: 40px;
+      margin-top: 40px; /* [cite: 181] */
     }
 
     .steps div {
       width: 30%;
       min-width: 220px;
-      background-color: #fff;
-      border-radius: 18px;
+      background-color: var(--white);
+      border-radius: 18px; /* [cite: 182] */
       padding: 20px;
       margin: 10px;
-      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 6px 15px var(--shadow-light);
       transition: transform 0.3s, box-shadow 0.3s;
-      text-align: center;
+      text-align: center; /* [cite: 183] */
     }
 
     .steps div:hover {
-      transform: scale(1.08);
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      transform: scale(1.05); /* [cite: 184] */
+      /* Slightly less scale for subtler effect */
+      box-shadow: 0 8px 20px var(--shadow-medium); /* [cite: 185] */
     }
 
     .steps h3 {
-      color: #1d4ed8;
+      color: var(--primary-blue);
       font-size: 1.2rem;
       margin-bottom: 10px;
+      font-weight: 600; /* [cite: 186] */
     }
 
     .steps p {
-      color: #475569;
-      font-size: 0.95rem;
+      color: var(--text-grey);
+      font-size: 0.95rem; /* [cite: 187] */
     }
 
     footer {
       text-align: center;
       padding: 20px;
       font-size: 0.9rem;
-      color: #64748b;
+      color: #64748b; /* [cite: 188] */
       margin-top: 40px;
+      background-color: #f8f9fa;
+      border-top: 1px solid #ddd;
     }
 
+    footer div {
+        max-width: 700px; /* [cite: 189] */
+        margin: 0 auto; /* Center footer content */
+    }
+
+    /* Media Queries for Responsiveness */
     @media (max-width: 768px) {
-      .steps {
+
+       html {
+           scroll-padding-top: 70px; /* [cite: 190] */
+           /* Increased padding on mobile */
+        }
+
+      nav {
+        padding: 10px 20px; /* [cite: 191] */
+        /* Reduce nav padding */
+         min-height: 60px; /* [cite: 192] */
+         /* Ensure min height */
+         align-items: center; /* [cite: 193] */
+         /* Vertically center items in the nav */
+      }
+
+      /* Adjust logo size on smaller screens if needed */
+       .logo-container img {
+           height: 50px; /* [cite: 194] */
+           /* Example: slightly smaller logo on mobile */
+           gap: 8px; /* [cite: 195] */
+        }
+       nav h2 {
+            font-size: 1.3rem; /* [cite: 196] */
+            /* Slightly smaller text on mobile */
+       }
+
+
+      nav ul {
+        /* Mobile Menu Styles */
+        position: fixed; /* [cite: 197] */
+        top: 70px; /* Below the nav bar on mobile (matches scroll-padding) */
+        right: 0; /* [cite: 198] */
+        width: 250px; /* Width of the side menu */
+        height: calc(100vh - 70px); /* [cite: 199] */
+        /* Full height below nav */
+        background-color: var(--primary-dark); /* [cite: 200] */
+        /* Same background as nav */
         flex-direction: column;
         align-items: center;
+        padding: 20px; /* [cite: 201] */
+        box-shadow: -4px 0 10px var(--shadow-medium);
+        transform: translateX(100%); /* Start off-screen */
+        transition: transform 0.3s ease-in-out; /* [cite: 202] */
+      }
+
+      nav ul li {
+        margin: 10px 0; /* [cite: 203] */
+        /* Space out mobile menu items */
+      }
+
+      nav ul li a {
+         color: var(--white); /* [cite: 204] */
+         /* Ensure text is white */
+         padding: 10px 0; /* [cite: 205] */
+         /* More clickable area */
+         width: 100%; /* [cite: 206] */
+         /* Make link fill width */
+         text-align: center; /* [cite: 207] */
+      }
+
+      nav ul li a::after {
+          height: 2px; /* [cite: 208] */
+          /* Thinner underline on mobile */
+      }
+
+
+      .hamburger {
+        display: flex; /* [cite: 209] */
+        /* Show hamburger on smaller screens */
+      }
+
+      .container {
+        padding: 20px; /* [cite: 210] */
+        /* Reduce container padding */
+        margin: 20px auto; /* [cite: 211] */
+        /* Adjust margin */
+      }
+
+      h1 {
+        font-size: 1.7rem; /* [cite: 212] */
+        /* Adjust heading size */
+        margin-bottom: 20px; /* [cite: 213] */
+      }
+
+      form, .live-link {
+        margin-top: 20px;
+        padding-top: 20px; /* [cite: 214] */
+      }
+
+      .steps {
+        flex-direction: column;
+        align-items: center; /* [cite: 215] */
       }
 
       .steps div {
-        width: 90%;
+        width: 90%; /* [cite: 216] */
+        margin: 10px 0; /* Adjust step card margin */
+        padding: 15px; /* [cite: 217] */
       }
-      
+
+      .steps h3 {
+        font-size: 1.1rem; /* [cite: 218] */
+      }
+
+      .steps p {
+        font-size: 0.9rem; /* [cite: 219] */
+      }
+
+       .live-link label {
+         font-size: 1rem; /* [cite: 220] */
+         /* Adjust live link label size */
+       }
+
+       .live-link a {
+         padding: 10px 15px; /* [cite: 221] */
+         /* Adjust live link button size */
+       }
+
+        input[type="submit"] {
+            padding: 10px 20px; /* [cite: 222] */
+            /* Adjust submit button size */
+        }
+
+        .wait-message, .file-name {
+            font-size: 0.65rem; /* [cite: 223] */
+            /* Slightly smaller text */
+        }
+
     }
   </style>
 </head>
 
 <body>
 
-  <!-- Navbar -->
   <nav>
-    <h2>Stampede AI</h2>
+     <div class="logo-container">
+        <img src="{{ url_for('static', filename='StampedeAi_Logo.png') }}" alt="Stampede AI Logo"> <h2>Stampede AI</h2>
+    </div>
+
+    <div class="hamburger">
+      <div class="line"></div>
+      <div class="line"></div>
+      <div class="line"></div>
+    </div>
     <ul>
       <li><a href="#">Home</a></li>
       <li><a href="#how-it-works">How It Works</a></li>
-      <li><a href="#upload">Upload</a></li>
-      <li><a href="#features">Features</a></li>
-      <li><a href="#contact">Contact</a></li>
+      <li><a href="#upload">Analyze</a></li>
+      <li><a href="#features">Features</a></li> <li><a href="#contact">Contact</a></li>
     </ul>
   </nav>
 
-  <!-- Upload Container -->
   <div class="container" id="upload">
     <h1>Stampede Risk Analysis</h1>
-    <form method="post" action="/upload_media" enctype="multipart/form-data">
-      <div>
-        <label for="media">Upload Image or Video File:</label>
-        <input type="file" id="media" name="media" accept="video/*,image/jpeg,image/png,image/gif" required>
-      </div>
-      <div>
-        <input type="submit" value="Analyze Uploaded Media">
-      </div>
-      <p class="wait-message">Please wait a few minutes while the media gets processed.</p>
-    </form>
+
     <div class="live-link">
-      <label>Or View Live Analysis:</label>
-      <a href="/live">Start Live Webcam Feed</a>
-    </div>
+      <label>View Live Analysis:</label>
+      <a href="{{ url_for('live_route') }}">Start Live Webcam Feed</a> </div>
+
+    <form id="uploadForm" method="post" action="{{ url_for('upload_media_route') }}" enctype="multipart/form-data"> <div>
+        <label for="media">Or Upload Image or Video File:</label>
+        <label class="file-input-wrapper">
+             Choose File <input type="file" id="media" name="media" accept="video/*,image/jpeg,image/png,image/gif" required> </label>
+        <div id="fileName" class="file-name">No file chosen</div> </div>
+      <div>
+        <input type="submit" value="Analyze Uploaded Media"> </div>
+      </form>
+
+    <div id="loadingState" class="loading-state" style="display: none;"> <div class="spinner"></div> <p id="loadingText">Processing media...</p> <progress id="progressBar" value="0" max="100" style="width: 80%; margin-top: 10px; display: none;"></progress>
+        <p class="wait-message">Analysis can take some time depending on file size and duration.</p> </div>
+
+    <div id="resultsArea" class="results-area" style="display: none;"> <p>Analysis Complete!</p>
+        <p>Stampede Risk: <strong id="riskLevel">Medium</strong></p>
+        <img id="analyzedImage" src="" alt="Analyzed Media Result" style="display: none;">
+        <video id="analyzedVideo" src="" controls style="display: none;"></video>
+        <p class="wait-message" style="color: var(--success-green)">Risk zones are highlighted on the media above.</p> </div>
+    <div id="errorState" class="error-message" style="display: none;"> <p>Analysis Failed!</p>
+        <p id="errorMessageContent">An unexpected error occurred. Please try again.</p> </div>
   </div>
 
-  <!-- How it works -->
   <div class="container" id="how-it-works">
     <h1>How It Works</h1>
     <div class="steps">
       <div>
-        <h3>1. Upload</h3>
-        <p>Select an image or video of the crowd scene you want to analyze.</p>
+        <h3>1. Input</h3> <p>Provide live feed or upload an image/video of the crowd scene.</p>
       </div>
       <div>
-        <h3>2. Analyze</h3>
-        <p>Our AI processes the file and detects crowd density and movement.</p>
+        <h3>2. Analyze</h3> <p>Our AI processes the input and detects crowd density and movement.</p>
       </div>
       <div>
-        <h3>3. Result</h3>
-        <p>Risk zones are marked and displayed for awareness and safety action.</p>
+        <h3>3. Result</h3> <p>Risk zones are marked and displayed for awareness and safety action.</p>
       </div>
     </div>
   </div>
 
-  <!-- Features Section -->
   <div class="container" id="features">
     <h1>Features</h1>
     <div class="steps">
@@ -290,8 +616,7 @@
       </div>
       <div>
         <h3>Instant Alerts</h3>
-        <p>Highlights high-density zones with a red overlay and live visual feedback.</p>
-      </div>
+        <p>Highlights high-density zones with a red overlay and live visual feedback.</p> </div>
       <div>
         <h3>Secure</h3>
         <p>Designed with edge devices to avoid data leaks and ensure user privacy.</p>
@@ -299,18 +624,150 @@
     </div>
   </div>
 
-  <!-- Contact Section -->
   <div class="container" id="contact">
     <h1>Contact Us</h1>
     <p style="text-align:center;">For queries or demo requests:<br><strong>@stampedeai.com</strong></p>
   </div>
 
-  <footer style="background-color: #f8f9fa; padding: 20px 0; text-align: center; font-size: 0.9em; color: #555; border-top: 1px solid #ddd;">
+  <footer>
     <div>
-        <p>&copy; 2025 <span style="font-weight: 600;">Team Arete</span>. All rights reserved.</p>
-        <p style="font-size: 0.8em; color: #888;">Committed to excellence in innovation and design.</p>
+        <p>&copy; 2025 <span style="font-weight: 600;">Team Arete</span>. All rights reserved.</p> <p style="font-size: 0.8em; color: #888;">Committed to excellence in innovation and design.</p>
     </div>
-</footer>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const hamburger = document.querySelector('.hamburger');
+      const body = document.body;
+      const navLinks = document.querySelectorAll('nav ul li a'); // Get all nav links [cite: 233]
+
+      // Hamburger Menu Toggle
+      hamburger.addEventListener('click', () => {
+        body.classList.toggle('nav-open');
+      }); // [cite: 234]
+
+      // Close menu when a link is clicked (for mobile UX)
+      navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+          if (body.classList.contains('nav-open')) {
+            body.classList.remove('nav-open');
+          }
+        });
+      });
+
+      // Custom File Input Display
+      const fileInput = document.getElementById('media'); // [cite: 235]
+      const fileNameDisplay = document.getElementById('fileName'); // [cite: 235]
+
+      fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0]; // [cite: 236]
+        if (file) {
+          fileNameDisplay.textContent = file.name;
+          fileNameDisplay.style.color = 'var(--text-dark)'; // [cite: 237]
+        } else {
+          fileNameDisplay.textContent = 'No file chosen'; // [cite: 238]
+          fileNameDisplay.style.color = 'var(--text-grey)';
+        }
+      });
+
+      // Form Submission with Fetch
+      const uploadForm = document.getElementById('uploadForm'); // [cite: 239]
+      const submitButton = uploadForm.querySelector('input[type="submit"]'); // [cite: 240]
+      const loadingState = document.getElementById('loadingState'); // [cite: 241]
+      const loadingText = document.getElementById('loadingText');
+      const progressBar = document.getElementById('progressBar');
+      const resultsArea = document.getElementById('resultsArea'); // [cite: 241]
+      const errorState = document.getElementById('errorState'); // [cite: 241]
+      const errorMessageContent = document.getElementById('errorMessageContent'); // [cite: 241]
+
+
+      uploadForm.addEventListener('submit', async (event) => { // Use async for fetch [cite: 243]
+          event.preventDefault(); // Prevent standard form submission
+
+          // Basic validation
+          if (!fileInput.files.length) { // [cite: 243]
+               alert('Please select a file to upload.');
+               return;
+          }
+          const file = fileInput.files[0];
+
+          // Hide form, previous results/errors, show loading
+          uploadForm.style.display = 'none'; // [cite: 244]
+          resultsArea.style.display = 'none';
+          errorState.style.display = 'none';
+          loadingState.style.display = 'block'; // [cite: 244]
+          loadingText.textContent = 'Uploading and processing...';
+          progressBar.style.display = 'none'; // Hide progress bar initially
+          progressBar.value = 0;
+          submitButton.disabled = true; // [cite: 244]
+
+          const formData = new FormData();
+          formData.append('media', file);
+
+          try {
+              // --- Actual Asynchronous Upload ---
+              const response = await fetch(uploadForm.action, { // Use form's action URL [cite: 245]
+                  method: 'POST',
+                  body: formData
+              });
+
+              // --- Handle Response ---
+              loadingState.style.display = 'none'; // Hide loading indicator
+
+              if (!response.ok) {
+                  // Handle HTTP errors (e.g., 500 Internal Server Error)
+                  let errorDetail = response.statusText;
+                  try {
+                      const errorJson = await response.json(); // Try to parse JSON error from Flask
+                      errorDetail = errorJson.error || errorDetail;
+                  } catch(e) { /* Ignore if response is not JSON */ }
+                  throw new Error(`Server error: ${response.status} ${errorDetail}`);
+              }
+
+              // Assuming the response is the HTML of the results page
+              const resultHtml = await response.text(); // [cite: 245]
+
+              // Replace the current page content with the results HTML
+              document.body.innerHTML = resultHtml;
+
+              // --- Add post-load script execution for results page audio ---
+              // We need to find and run the script tag within the loaded HTML
+              const tempDiv = document.createElement('div');
+              tempDiv.innerHTML = resultHtml;
+              const scripts = tempDiv.querySelectorAll('script');
+              scripts.forEach(script => {
+                  const newScript = document.createElement('script');
+                  if (script.src) {
+                      newScript.src = script.src; // Handle external scripts if any
+                  } else {
+                      newScript.textContent = script.textContent; // Execute inline scripts
+                  }
+                  // Append to body to execute. Be cautious with arbitrary script execution.
+                  document.body.appendChild(newScript);
+              });
+
+
+          } catch (error) {
+              // --- Handle Network or Processing Errors ---
+              console.error('Upload failed:', error);
+              loadingState.style.display = 'none'; // Hide loading
+              errorState.style.display = 'block'; // Show error section [cite: 259]
+              errorMessageContent.textContent = `Analysis failed: ${error.message}. Please try again.`; // [cite: 260]
+              uploadForm.style.display = 'flex'; // Show form again [cite: 261]
+              submitButton.disabled = false; // Re-enable button [cite: 262]
+          }
+      });
+
+      // Reset state when a new file is chosen after an error [cite: 264]
+      fileInput.addEventListener('change', () => {
+          errorState.style.display = 'none'; // Hide error if user selects a new file
+          resultsArea.style.display = 'none'; // Hide results too
+          uploadForm.style.display = 'flex'; // Ensure form is visible if hidden
+          submitButton.disabled = false; // Ensure button is enabled
+          loadingState.style.display = 'none'; // Ensure loading is hidden too
+      }); // [cite: 265, 266]
+    });
+  </script>
 
 </body>
 </html>
