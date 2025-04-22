@@ -1,19 +1,20 @@
-# app.py
-
 # Required Imports
-from flask import Flask, render_template, request, url_for, Response, stream_with_context, redirect, send_from_directory
+from flask import Flask, render_template, request, url_for, Response, stream_with_context, redirect, send_from_directory, jsonify
 import os
 import cv2 # OpenCV
-import tensorflow as tf
-import tensorflow_hub as hub
+# import tensorflow as tf -> No longer needed for TF Hub model
+# import tensorflow_hub as hub -> No longer needed
 import numpy as np
 import sys
 import time
-from fluvio import Fluvio
+from fluvio import Fluvio # Assuming you still want Fluvio integration
 import json
 from werkzeug.utils import secure_filename
 import mimetypes
 import shutil
+from ultralytics import YOLO # Import YOLO from ultralytics
+from queue import Queue # For sharing status between threads/generators
+import threading # For thread safety with shared status
 
 # --- Flask Application Setup ---
 app = Flask(__name__)
@@ -21,140 +22,115 @@ app = Flask(__name__)
 # --- Configuration for Folders ---
 UPLOAD_FOLDER = 'uploads'
 STATIC_FOLDER = 'static'
-PROCESSED_FRAMES_FOLDER = os.path.join(STATIC_FOLDER, 'processed_frames') # Will store critical frames
-PROCESSED_VIDEO_FOLDER = os.path.join(STATIC_FOLDER, 'processed_videos') # Will store full processed videos
-PROCESSED_IMAGE_FOLDER = os.path.join(STATIC_FOLDER, 'processed_images') # Will store processed images
-DEBUG_FRAMES_FOLDER = os.path.join(STATIC_FOLDER, 'debug_frames') # Not actively used in final version, but kept
+PROCESSED_FRAMES_FOLDER = os.path.join(STATIC_FOLDER, 'processed_frames')
+PROCESSED_VIDEO_FOLDER = os.path.join(STATIC_FOLDER, 'processed_videos')
+PROCESSED_IMAGE_FOLDER = os.path.join(STATIC_FOLDER, 'processed_images')
+DEBUG_FRAMES_FOLDER = os.path.join(STATIC_FOLDER, 'debug_frames')
 
 for folder in [UPLOAD_FOLDER, PROCESSED_FRAMES_FOLDER, PROCESSED_VIDEO_FOLDER, PROCESSED_IMAGE_FOLDER, DEBUG_FRAMES_FOLDER]:
     if not os.path.exists(folder):
         os.makedirs(folder)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['PROCESSED_VIDEO_FOLDER'] = PROCESSED_VIDEO_FOLDER # Add this for send_from_directory
-
+app.config['PROCESSED_VIDEO_FOLDER'] = PROCESSED_VIDEO_FOLDER
 
 # --- Load Machine Learning Model ---
-DETECTOR_HANDLE = "https://tfhub.dev/tensorflow/ssd_mobilenet_v2/fpnlite_320x320/1"
-detector = None
+# Using YOLOv8 Nano (yolov8n.pt) - fast and lightweight.
+# You can change to yolov8s.pt, yolov8m.pt etc. for higher accuracy but slower speed.
+MODEL_PATH = "yolo11n.pt"
+yolo_model = None
 try:
-    print(f"Loading detection model from: {DETECTOR_HANDLE}...")
-    # Suppress TF logging during model loading for cleaner output
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Suppress info and warning messages
-    detector = hub.load(DETECTOR_HANDLE)
-    os.environ.pop('TF_CPP_MIN_LOG_LEVEL', None) # Restore logging
-    print("Model loaded successfully.")
+    print(f"Loading YOLO model from: {MODEL_PATH}...")
+    yolo_model = YOLO(MODEL_PATH)
+    # Perform a dummy prediction to fully initialize the model (optional but good practice)
+    _ = yolo_model.predict(np.zeros((640, 640, 3)), verbose=False)
+    print("YOLO model loaded successfully.")
 except Exception as e:
-    os.environ.pop('TF_CPP_MIN_LOG_LEVEL', None) # Restore logging on error too
-    print(f"FATAL ERROR: Could not load the detection model: {e}")
-    print("Ensure you have internet access and the model URL is correct.")
-    detector = None # Ensure detector is None if loading fails
+    print(f"FATAL ERROR: Could not load the YOLO model ({MODEL_PATH}): {e}")
+    print("Ensure 'ultralytics' is installed (`pip install ultralytics`) and the model file exists.")
+    yolo_model = None
 
 # --- Model Specific Settings ---
-PERSON_CLASS_INDEX = 1
-DETECTION_THRESHOLD = 0.22 # Confidence threshold for detections
+# For COCO dataset used by standard YOLO models, 'person' is usually class index 0
+PERSON_CLASS_INDEX = 0
+DETECTION_THRESHOLD = 0.00987 # Confidence threshold for YOLO detections (adjust as needed)
 
-# --- Density Analysis Settings ---
-HIGH_DENSITY_THRESHOLD = 6 # People count per cell to be considered 'High Density'
-CRITICAL_DENSITY_THRESHOLD = 9 # People count per cell to be considered 'Critical Density'
-HIGH_DENSITY_CELL_COUNT_THRESHOLD = 3 # Number of High Density cells to trigger 'High Density Warning'
-CRITICAL_DENSITY_CELL_COUNT_THRESHOLD = 2 # Number of Critical Density cells to trigger 'CRITICAL RISK'
+# --- Density Analysis Settings (remain the same) ---
+HIGH_DENSITY_THRESHOLD = 6
+CRITICAL_DENSITY_THRESHOLD = 9
+HIGH_DENSITY_CELL_COUNT_THRESHOLD = 3
+CRITICAL_DENSITY_CELL_COUNT_THRESHOLD = 2
 GRID_ROWS = 8
 GRID_COLS = 8
-# Hierarchy for status messages - higher number means higher priority
 STATUS_HIERARCHY = {
-    "Normal": 0,
-    "High Density Cell Detected": 1,
-    "High Density Warning": 2,
-    "Critical Density Cell Detected": 3,
-    "CRITICAL RISK": 4,
-    # Error/Processing statuses (lower priority in comparison, but useful states)
-    "Processing Started": -2,
-    "Analysis Incomplete": -1,
-    "Analysis Incomplete (Tiny Frame)": -1, # Specific incomplete status
-    "Error: Model Not Loaded": -10, # Make model loading error very low priority
-    "Error: Could not open input video": -5,
-    "Error: Failed to initialize VideoWriter": -5,
-    "Error: Video writing failed": -5,
-    "Error: Output video generation failed": -5,
-    "Error: Image processing failed": -5,
-    "Error: Unsupported file type": -5,
-    "Error: Unexpected failure during video processing": -6 # Generic failure error
+    "Normal": 0, "High Density Cell Detected": 1, "High Density Warning": 2,
+    "Critical Density Cell Detected": 3, "CRITICAL RISK": 4,
+    "Processing Started": -2, "Analysis Incomplete": -1, "Analysis Incomplete (No Content)": -1,
+    "Analysis Incomplete (Invalid Content)": -1, "Analysis Incomplete (Tiny Frame)": -1,
+    "Error: Model Not Loaded": -10, "Error: Could not open input video": -5,
+    "Error: Failed to initialize VideoWriter": -5, "Error: Video writing failed": -5,
+    "Error: Output video generation failed": -5, "Error: Image processing failed": -5,
+    "Error: Unsupported file type": -5, "Error: Unexpected failure during video processing": -6,
+    "Error: Invalid video dimensions": -5, "Error: Processing Error": -7, # Added generic processing error
+    "Error: TF Resource Exhausted": -8 # Keep just in case, though less likely now
 }
 
 
-# --- Fluvio Settings ---
+# --- Fluvio Settings (Optional - Keep if needed) ---
 FLUVIO_CROWD_TOPIC = "crowd-data"
-# Global variables for Fluvio client and producer
 fluvio_client = None
 fluvio_producer = None
-
+# --- Fluvio connect/send functions (keep as before if using Fluvio) ---
 def connect_fluvio():
-    """Attempts to connect to Fluvio and create a topic producer."""
-    global fluvio_client, fluvio_producer # Declare intention to modify globals
-    if fluvio_producer: # Already connected
-         # print("Fluvio producer already initialized.") # Avoid spamming logs
-         return True
-
+    global fluvio_client, fluvio_producer
+    if fluvio_producer: return True
     print("Attempting to connect to Fluvio...")
     sys.stdout.flush()
     try:
-        # Assuming local default connection. Adjust if needed (e.g., Fluvio.connect("cloud_endpoint:9003"))
         fluvio_client = Fluvio.connect()
-        print("Fluvio client connected successfully.")
-        sys.stdout.flush()
-
-        # Get a producer for the specified topic
+        print("Fluvio client connected.")
         fluvio_producer = fluvio_client.topic_producer(FLUVIO_CROWD_TOPIC)
         print(f"Fluvio producer ready for topic '{FLUVIO_CROWD_TOPIC}'.")
         sys.stdout.flush()
         return True
     except Exception as e:
-        print(f"!!! FLUVIO ERROR: Could not connect or get producer for topic '{FLUVIO_CROWD_TOPIC}'.")
-        print(f"    Error details: {e}")
-        print("    Check if Fluvio cluster is running and topic exists.")
-        sys.stdout.flush()
-        fluvio_client = None # Ensure client is None on failure
-        fluvio_producer = None # Ensure producer is None on failure
+        print(f"!!! FLUVIO ERROR: {e}")
+        fluvio_client = None
+        fluvio_producer = None
         return False
 
 def send_to_fluvio(key, data_dict):
-    """Sends data dictionary as JSON to the configured Fluvio topic."""
-    global fluvio_producer # Access the global producer
-    if not fluvio_producer:
-        # print("Fluvio producer not available. Cannot send data.") # Can be noisy
-        return # Silently fail if producer not ready
-
+    global fluvio_producer
+    if not fluvio_producer: return
     try:
-        # Ensure key is bytes
         key_bytes = str(key).encode('utf-8')
-        # Ensure data is JSON string, then encode to bytes
         data_json_str = json.dumps(data_dict)
         data_bytes = data_json_str.encode('utf-8')
-
-        # Send the record - basic send is blocking but simpler for this setup
         fluvio_producer.send(key_bytes, data_bytes)
-        # print(f"-> Sent data to Fluvio (Key: {key}, Status: {data_dict.get('frame_status')})") # Can be noisy, enable for debug
     except Exception as e:
-        print(f"!!! FLUVIO WARNING: Could not send data (Key: {key}) to topic '{FLUVIO_CROWD_TOPIC}'.")
-        print(f"    Error details: {e}")
-        # In a production app, you might try to reconnect or queue failed messages
+        print(f"!!! FLUVIO WARNING sending data (Key: {key}): {e}")
 
+# --- Shared State for Live Status Updates (SSE) ---
+# Using a simple dictionary with a lock for basic thread safety
+live_status_lock = threading.Lock()
+live_status_data = {"status": "Initializing", "persons": 0}
+# Using a Queue to signal updates to the SSE generator
+status_update_queue = Queue()
 
 # --- Helper Functions ---
 def analyze_density_grid(density_grid):
     """Analyzes the grid to determine status and risky cells."""
+    # (Keep this function exactly as in the previous version)
     high_density_cells = 0
     critical_density_cells = 0
-    risky_cell_coords = [] # List of (row, col) for risky cells
+    risky_cell_coords = [] # List of (row, col) for cells needing overlay
     overall_status = "Normal"
     total_people_in_grid = 0
 
-    if not density_grid or len(density_grid) != GRID_ROWS:
-        # print("   Warning: Invalid density grid received.") # Can be noisy
-        return overall_status, risky_cell_coords, total_people_in_grid, high_density_cells, critical_density_cells
+    if not isinstance(density_grid, list) or len(density_grid) != GRID_ROWS:
+        return "Analysis Incomplete (Invalid Grid)", risky_cell_coords, 0, 0, 0
 
     for r_idx, row in enumerate(density_grid):
-        if len(row) != GRID_COLS: continue
+        if not isinstance(row, list) or len(row) != GRID_COLS: continue
         for c_idx, count in enumerate(row):
             try:
                 person_count = int(count)
@@ -164,12 +140,11 @@ def analyze_density_grid(density_grid):
                     risky_cell_coords.append((r_idx, c_idx))
                 elif person_count >= HIGH_DENSITY_THRESHOLD:
                     high_density_cells += 1
-                    # Add high density cells to risky_cell_coords as they also get an overlay
-                    risky_cell_coords.append((r_idx, c_idx))
+                    risky_cell_coords.append((r_idx, c_idx)) # Also mark high density cells
             except (ValueError, TypeError):
-                continue # Skip invalid cell counts
+                continue # Skip non-integer cell counts
 
-    # Determine overall status based on cell counts
+    # Determine overall status based on cell counts and thresholds
     if critical_density_cells >= CRITICAL_DENSITY_CELL_COUNT_THRESHOLD:
         overall_status = "CRITICAL RISK"
     elif critical_density_cells > 0:
@@ -179,280 +154,257 @@ def analyze_density_grid(density_grid):
     elif high_density_cells > 0:
         overall_status = "High Density Cell Detected"
 
-    # Return all calculated values
     return overall_status, risky_cell_coords, total_people_in_grid, high_density_cells, critical_density_cells
 
 
 def get_higher_priority_status(status1, status2):
     """Compares two status strings and returns the one with higher priority."""
-    p1 = STATUS_HIERARCHY.get(status1, -1)
-    p2 = STATUS_HIERARCHY.get(status2, -1)
+    # (Keep this function exactly as in the previous version)
+    p1 = STATUS_HIERARCHY.get(status1, -99)
+    p2 = STATUS_HIERARCHY.get(status2, -99)
     return status1 if p1 >= p2 else status2
 
+# --- Text Drawing Helper ---
+def draw_text_with_bg(img, text, origin, font, scale, fg_color, bg_color, thickness, padding, bg_alpha):
+    """Draws text with a semi-transparent background."""
+    # (Keep this function exactly as in the previous version)
+    try:
+        text_size, baseline = cv2.getTextSize(text, font, scale, thickness)
+        text_w, text_h = text_size
+        x, y = origin
 
-# --- Frame/Image Processing Function ---
-def process_media_content(content, content_width, content_height, frame_or_image_index, current_overall_status_context="Normal"):
+        # Adjust y-origin upwards based on text height/baseline for better positioning
+        # Calculate rectangle coordinates
+        rect_y1 = y - text_h - padding - baseline // 2
+        rect_y2 = y + padding - baseline // 2
+        rect_x1 = x - padding
+        rect_x2 = x + text_w + padding
+
+        # Ensure rectangle coordinates are within image bounds
+        rect_y1 = max(0, rect_y1); rect_x1 = max(0, rect_x1)
+        rect_y2 = min(img.shape[0], rect_y2); rect_x2 = min(img.shape[1], rect_x2)
+
+        if rect_y2 > rect_y1 and rect_x2 > rect_x1: # Check if rectangle has valid dimensions
+            sub_img = img[rect_y1:rect_y2, rect_x1:rect_x2]
+            if sub_img.shape[0] > 0 and sub_img.shape[1] > 0: # Ensure sub-image is valid
+                bg_rect = np.zeros(sub_img.shape, dtype=np.uint8)
+                bg_rect[:] = bg_color
+                res = cv2.addWeighted(sub_img, 1.0 - bg_alpha, bg_rect, bg_alpha, 0)
+                img[rect_y1:rect_y2, rect_x1:rect_x2] = res
+            else:
+                 print(f"Warning: Invalid sub-image for text background at {origin}.")
+
+
+        # Draw the text itself (adjust y slightly for baseline)
+        cv2.putText(img, text, (x, y - baseline // 2), font, scale, fg_color, thickness, cv2.LINE_AA)
+    except Exception as e:
+        print(f"Error drawing text '{text}' at {origin}: {e}")
+
+
+# --- Frame/Image Processing Function (UPDATED FOR YOLO) ---
+def process_media_content(content, content_width, content_height, frame_or_image_index, is_live_stream=False):
     """
-    Processes a single image or video frame: detects people, calculates density,
-    determines status, draws overlays/text, AND sends data to Fluvio.
-    Returns the processed content (image/frame), content status, and confirmed person count.
+    Processes a single image or video frame using YOLO: detects people, calculates density,
+    determines status, draws overlays/text, sends data to Fluvio, and updates live status.
+    Returns the processed content, frame status, and person count.
     """
+    global live_status_data # Access the shared status dictionary
+
     if content is None:
-        # print(f"Warning: Received None content for processing at index {frame_or_image_index}")
-        # Return context status or a generic incomplete status, 0 people
         return None, "Analysis Incomplete (No Content)", 0
 
-    if detector is None:
-         # Handle case where model loading failed at startup
-         error_frame = content.copy() if content is not None else np.zeros((content_height or 480, content_width or 640, 3), dtype=np.uint8)
-         cv2.putText(error_frame, "MODEL ERROR!", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
-         print(f"!!! Skipping processing for index {frame_or_image_index}: ML model not loaded.")
-         # Return a clear error status, but keep the count at 0 as detection didn't happen
+    if yolo_model is None:
+         # Draw error message directly on a blank frame if model is missing
+         error_frame = np.zeros((content_height or 480, content_width or 640, 3), dtype=np.uint8)
+         draw_text_with_bg(error_frame, "MODEL NOT LOADED!", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), (0,0,0), 2, 5, 0.7)
+         print(f"!!! Skipping processing for index {frame_or_image_index}: YOLO model not loaded.")
+         # Update live status if applicable
+         if is_live_stream:
+            with live_status_lock:
+                live_status_data["status"] = "Error: Model Not Loaded"
+                live_status_data["persons"] = 0
+            status_update_queue.put(True) # Signal update
          return error_frame, "Error: Model Not Loaded", 0
 
-
     start_process_time = time.time()
-    # Ensure content is valid before copying
-    if content is None:
-         return None, "Analysis Incomplete (Invalid Content)", 0
-    processed_content = content.copy() # Always work on a copy
+    processed_content = content.copy() # Work on a copy
 
-    content_status = "Analysis Incomplete" # Default status for this frame
+    content_status = "Analysis Incomplete" # Default status for this frame/image
     confirmed_person_count_this_content = 0
     density_grid = [[0 for _ in range(GRID_COLS)] for _ in range(GRID_ROWS)]
-    risky_coords = [] # Initialize risky coords list
+    risky_coords = []
     high_cells = 0
     crit_cells = 0
 
-
     try:
-        # --- 1. ML Preprocessing & Detection ---
-        # Ensure image is in the correct color space for the model (often RGB expected by TF models)
-        # OpenCV reads as BGR by default
-        if len(content.shape) == 2: rgb_content = cv2.cvtColor(content, cv2.COLOR_GRAY2RGB)
-        elif content.shape[2] == 4: rgb_content = cv2.cvtColor(content, cv2.COLOR_BGRA2RGB)
-        elif content.shape[2] == 3: rgb_content = cv2.cvtColor(content, cv2.COLOR_BGR2RGB)
-        else: rgb_content = content # Fallback - hope it's already RGB or grayscale
+        # --- 1. YOLO Detection ---
+        # YOLOv8 typically expects BGR images directly from OpenCV
+        # The model handles resizing and normalization internally.
+        results = yolo_model.predict(source=content, verbose=False, conf=DETECTION_THRESHOLD, classes=[PERSON_CLASS_INDEX])
 
-        # The detector expects uint8 and specific dimensions (like 320x320),
-        # but hub.load often handles resizing internally. We provide the original size image tensor.
-        image_tensor = tf.expand_dims(tf.convert_to_tensor(rgb_content, dtype=tf.uint8), axis=0)
-        detections = detector(image_tensor)
+        # Results is a list, usually with one element for one image
+        if results and results[0]:
+            detected_boxes = results[0].boxes.xyxy.cpu().numpy() # Bounding boxes (xmin, ymin, xmax, ymax)
+            # confidences = results[0].boxes.conf.cpu().numpy() # Confidence scores
+            # classes = results[0].boxes.cls.cpu().numpy() # Class indices
 
-        # Filter detections based on score threshold and class (PERSON_CLASS_INDEX)
-        # Using boolean masking is efficient with TensorFlow outputs
-        detection_scores = detections['detection_scores'][0]
-        detection_classes = detections['detection_classes'][0].numpy().astype(int)
-        detection_boxes = detections['detection_boxes'][0]
-
-        # Create boolean mask: score >= threshold AND class == PERSON
-        is_person = (detection_classes == PERSON_CLASS_INDEX)
-        is_confident = (detection_scores >= DETECTION_THRESHOLD)
-        valid_detections_mask = is_person & is_confident
-
-        # Apply mask to get filtered boxes, classes, and scores
-        filtered_boxes = tf.boolean_mask(detection_boxes, valid_detections_mask).numpy()
-        # filtered_classes = tf.boolean_mask(detection_classes, valid_detections_mask).numpy() # Not strictly needed for density/count
-        # filtered_scores = tf.boolean_mask(detection_scores, valid_detections_mask).numpy() # Not strictly needed for density/count
+            confirmed_person_count_this_content = len(detected_boxes)
+        else:
+            confirmed_person_count_this_content = 0
+            detected_boxes = []
 
 
-        # --- 2. Calculate Grid & Filter Detections ---
-        confirmed_person_count_this_content = filtered_boxes.shape[0] # Count of persons above threshold
-
+        # --- 2. Calculate Grid Density ---
         cell_height = content_height // GRID_ROWS
         cell_width = content_width // GRID_COLS
 
         if cell_height <= 0 or cell_width <= 0:
-            print(f"Warning: Content dimensions ({content_width}x{content_height}) too small for grid size ({GRID_COLS}x{GRID_ROWS}). Skipping density analysis for index {frame_or_image_index}.")
-            # Set status to reflect incomplete analysis if grid is not possible
+            print(f"Warning: Content dimensions ({content_width}x{content_height}) too small for grid. Skipping density.")
             content_status = "Analysis Incomplete (Tiny Frame)"
-            # No density grid calculation or analysis - density_grid remains [[0...]]
         else:
-             # Populate density grid
-             for i in range(filtered_boxes.shape[0]):
-                 # Note: boxes are [ymin, xmin, ymax, xmax] in relative coordinates (0 to 1)
-                 ymin, xmin, ymax, xmax = filtered_boxes[i]
-                 # Calculate center point in pixel coordinates
-                 center_x = int((xmin + xmax) / 2 * content_width)
-                 center_y = int((ymin + ymax) / 2 * content_height)
+             # Populate density grid based on center point of detected boxes
+             for box in detected_boxes:
+                 xmin, ymin, xmax, ymax = box
+                 # Calculate center point
+                 center_x = int((xmin + xmax) / 2)
+                 center_y = int((ymin + ymax) / 2)
+                 # Clamp coordinates to be within image bounds before calculating grid cell
+                 center_x = max(0, min(center_x, content_width - 1))
+                 center_y = max(0, min(center_y, content_height - 1))
 
-                 # Determine grid cell - ensure bounds are safe
                  row = min(max(0, center_y // cell_height), GRID_ROWS - 1)
                  col = min(max(0, center_x // cell_width), GRID_COLS - 1)
-
-                 # Increment density count for the cell
                  density_grid[row][col] += 1
 
-
              # --- 3. Analyze Density Grid ---
-             content_status, risky_coords, total_grid_people, high_cells, crit_cells = analyze_density_grid(density_grid)
+             content_status, risky_coords, _, high_cells, crit_cells = analyze_density_grid(density_grid)
 
 
-        # --- 4. Send Data to Fluvio ---
-        fluvio_payload = {
-            "timestamp": int(time.time()), # Current timestamp
-            "frame": frame_or_image_index, # Frame number or image index (e.g., 0 for single image)
-            "density_grid": density_grid, # The calculated grid (will be [[0...]] if grid analysis skipped)
-            "frame_status": content_status, # Status determined for this frame
-            "confirmed_persons": confirmed_person_count_this_content, # Persons detected above threshold
-            "high_density_cells": high_cells, # Count of cells >= HIGH_DENSITY_THRESHOLD (0 if grid skipped)
-            "critical_density_cells": crit_cells # Count of cells >= CRITICAL_DENSITY_THRESHOLD (0 if grid skipped)
-        }
-        # Use a composite key including original filename or source identifier if available
-        # For simplicity here, using a generic key with index.
-        # In a multi-camera setup, the key should include camera ID.
-        send_to_fluvio(f"content-{frame_or_image_index}", fluvio_payload)
+        # --- 4. Send Data to Fluvio (Optional) ---
+        if fluvio_producer: # Check if Fluvio is active
+            fluvio_payload = {
+                "timestamp": int(time.time()), "frame": frame_or_image_index, "density_grid": density_grid,
+                "frame_status": content_status, "confirmed_persons": confirmed_person_count_this_content,
+                "high_density_cells": high_cells, "critical_density_cells": crit_cells
+            }
+            send_to_fluvio(f"media-{frame_or_image_index}", fluvio_payload)
+
+        # --- 5. Update Live Status (if processing for live stream) ---
+        if is_live_stream:
+            with live_status_lock:
+                live_status_data["status"] = content_status
+                live_status_data["persons"] = confirmed_person_count_this_content
+            status_update_queue.put(True) # Signal that new data is available
 
 
-        # --- 5. Draw Overlays and Text ---
-        # --- REMOVED: Grid line drawing ---
-
-        # Draw overlays for individual risky grid cells
+        # --- 6. Draw Overlays and Text ---
+        # Draw overlays for risky grid cells (same logic as before)
         overlay_alpha = 0.4
         overlay_color_critical = (0, 0, 255) # Red (BGR)
         overlay_color_high = (0, 165, 255) # Orange (BGR)
 
-        if cell_height > 0 and cell_width > 0: # Only draw overlays if grid dimensions are valid
+        if cell_height > 0 and cell_width > 0:
+             overlay = processed_content.copy()
              for r, c in risky_coords:
                  cell_y_start = r * cell_height
                  cell_y_end = (r + 1) * cell_height
                  cell_x_start = c * cell_width
                  cell_x_end = (c + 1) * cell_width
-
-                 risk_level_in_cell = "high" # Assume high unless proven critical
-                 try:
-                     if density_grid[r][c] >= CRITICAL_DENSITY_THRESHOLD: risk_level_in_cell = "critical"
-                 except IndexError:
-                      continue # Should not happen with robust index calculation
-
-                 color = overlay_color_critical if risk_level_in_cell == "critical" else overlay_color_high
-                 overlay = processed_content.copy() # Create a fresh overlay copy for blending
+                 color = overlay_color_critical if density_grid[r][c] >= CRITICAL_DENSITY_THRESHOLD else overlay_color_high
                  cv2.rectangle(overlay, (cell_x_start, cell_y_start), (cell_x_end, cell_y_end), color, -1)
-                 # Blend the overlay onto the processed_content
-                 cv2.addWeighted(overlay, overlay_alpha, processed_content, 1 - overlay_alpha, 0, processed_content)
+             cv2.addWeighted(overlay, overlay_alpha, processed_content, 1 - overlay_alpha, 0, processed_content)
 
-                 # Optionally draw person count in the cell
-                 # try:
-                 #     if density_grid[r][c] > 0:
-                 #         count_text = str(density_grid[r][c])
-                 #         # Center text within the cell (simple approximate centering)
-                 #         text_size, _ = cv2.getTextSize(count_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                 #         text_x = cell_x_start + (cell_width - text_size[0]) // 2
-                 #         text_y = cell_y_start + (cell_height + text_size[1]) // 2
-                 #         cv2.putText(processed_content, count_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                 # except IndexError:
-                 #     pass # Should not happen
-
-
-        # Draw Status Text & Stampede Chance Text
-        # For the *output frame*, we should show *its* specific status.
+        # Determine colors and text
         frame_display_status = content_status
+        status_color = (0, 128, 0); # Default Green
+        if "CRITICAL" in frame_display_status: status_color = (0, 0, 255)
+        elif "Warning" in frame_display_status or "High" in frame_display_status or "Detected" in frame_display_status: status_color = (0, 165, 255)
+        elif "Error" in frame_display_status or "Incomplete" in frame_display_status: status_color = (0, 0, 255) # Red
 
-        status_text = f"Risk: {frame_display_status}"
-        status_color = (0, 128, 0) # Green default
-        if "CRITICAL" in frame_display_status: status_color = (0, 0, 255) # Red
-        elif "Warning" in frame_display_status or "High" in frame_display_status or "Detected" in frame_display_status: status_color = (0, 165, 255) # Orange
-        elif "Error" in frame_display_status or "Incomplete" in frame_display_status: status_color = (0, 0, 255) # Red for errors
-
-        # Stampede Chance Text determination based on frame status
         if "CRITICAL" in frame_display_status: chance_text, chance_color = "Stampede Chance: Critical", (0, 0, 255)
         elif "Warning" in frame_display_status or "High" in frame_display_status or "Detected" in frame_display_status: chance_text, chance_color = "Stampede Chance: High", (0, 165, 255)
         else: chance_text, chance_color = "Stampede Chance: Low", (0, 128, 0)
 
-
-        # Add text with background rectangles for readability
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.7
-        font_thickness = 2
-        padding = 5
-        bg_color = (50, 50, 50) # Dark gray background
-        # text_color = (255, 255, 255) # White text color outline/background - color is set by status/chance
-
-        # Status text - Top Left
-        (text_w_s, text_h_s), baseline_s = cv2.getTextSize(status_text, font, font_scale, font_thickness)
-        # Add background rectangle
-        cv2.rectangle(processed_content, (padding, padding), (padding * 2 + text_w_s, padding * 2 + text_h_s), bg_color, -1)
-        # Add text
-        cv2.putText(processed_content, status_text, (padding + 5, padding + text_h_s + 5), font, font_scale, status_color, font_thickness, cv2.LINE_AA)
-
-
-        # Chance text - Bottom Left
-        (text_w_c, text_h_c), baseline_c = cv2.getTextSize(chance_text, font, font_scale, font_thickness)
-        # Add background rectangle
-        cv2.rectangle(processed_content, (padding, content_height - padding * 2 - text_h_c), (padding * 2 + text_w_c, content_height - padding), bg_color, -1)
-        # Add text
-        cv2.putText(processed_content, chance_text, (padding + 5, content_height - padding - baseline_c), font, font_scale, chance_color, font_thickness, cv2.LINE_AA)
-
-        # Optional: Display person count somewhere (e.g., top right)
+        status_text = f"Risk: {frame_display_status}"
         person_count_text = f"Persons: {confirmed_person_count_this_content}"
-        (text_w_p, text_h_p), baseline_p = cv2.getTextSize(person_count_text, font, font_scale, font_thickness)
-        cv2.rectangle(processed_content, (content_width - text_w_p - padding*2, padding), (content_width - padding, padding * 2 + text_h_p), bg_color, -1)
-        cv2.putText(processed_content, person_count_text, (content_width - text_w_p - padding, padding + text_h_p + 5), font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
 
+        # Draw text using helper function
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.6
+        font_thickness = 1
+        text_padding = 5
+        bg_alpha = 0.6
+        bg_color = (0, 0, 0) # Black background
+
+        draw_text_with_bg(processed_content, status_text, (10, 20 + text_padding), font, font_scale, status_color, bg_color, font_thickness, text_padding, bg_alpha)
+        (text_w_p, _), _ = cv2.getTextSize(person_count_text, font, font_scale, font_thickness)
+        draw_text_with_bg(processed_content, person_count_text, (content_width - text_w_p - 10 - text_padding * 2, 20 + text_padding), font, font_scale, (255, 255, 255), bg_color, font_thickness, text_padding, bg_alpha)
+        (text_w_c, text_h_c), baseline_c = cv2.getTextSize(chance_text, font, font_scale, font_thickness)
+        draw_text_with_bg(processed_content, chance_text, (10, content_height - 10 - baseline_c), font, font_scale, chance_color, bg_color, font_thickness, text_padding, bg_alpha)
 
 
     except Exception as e:
-        print(f"!!! ERROR during process_media_content for index {frame_or_image_index}: {e}")
-        # Draw error text on frame instead of processing results
-        # Ensure frame exists before copying/drawing
+        print(f"!!! UNEXPECTED ERROR during process_media_content (YOLO) for index {frame_or_image_index}: {e}")
+        # Draw generic error on frame
         error_frame = content.copy() if content is not None else np.zeros((content_height or 480, content_width or 640, 3), dtype=np.uint8)
-        cv2.putText(error_frame, f"Processing Error: {e}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
-        # Return the error frame + error status + 0 count
-        return error_frame, f"Error: {e}", 0
+        err_msg = f"Processing Error: {type(e).__name__}"
+        draw_text_with_bg(error_frame, err_msg, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), (0,0,0), 2, 5, 0.7)
+        content_status = "Error: Processing Error"
+        confirmed_person_count_this_content = 0
+        # Update live status if applicable
+        if is_live_stream:
+            with live_status_lock:
+                live_status_data["status"] = content_status
+                live_status_data["persons"] = 0
+            status_update_queue.put(True) # Signal update
+        return error_frame, content_status, confirmed_person_count_this_content
 
+
+    # Optional: Log processing time
     # end_process_time = time.time()
     # print(f" -> Index {frame_or_image_index} processed in {end_process_time - start_process_time:.3f}s. Status: {content_status}")
 
-    # Return processed frame, its specific status, and person count
     return processed_content, content_status, confirmed_person_count_this_content
 
 
 # --- Flask Routes ---
 @app.route('/', methods=['GET'])
 def index_route():
-    """Serves the main page."""
+    """Serves the main upload page (index.html)."""
     return render_template('index.html')
 
 @app.route('/upload_media', methods=['POST'])
 def upload_media_route():
+    """Handles media uploads, processes with YOLO, and shows results."""
+    # (This route remains largely the same as the previous version,
+    #  but calls the updated process_media_content function.
+    #  Key changes are checking yolo_model instead of detector,
+    #  and the process_media_content call itself.)
     print("\n--- Request received for /upload_media ---")
-    if fluvio_producer:
-         print("   Fluvio Status: Producer is active.")
-    else:
-         print("   Fluvio Status: Producer is INACTIVE.")
-    sys.stdout.flush()
+    # Optional: Reconnect Fluvio if needed
+    connect_fluvio()
 
-    # Check if model is loaded before proceeding with processing
-    if detector is None:
-        print("!!! ERROR: ML model not loaded. Cannot process media.")
-        # Render results page with an error status
-        return render_template('results.html',
-                               output_media_type=None,
-                               processed_media_url=None,
-                               download_video_url=None,
-                               prediction_status="Error: Model Not Loaded",
-                               max_persons=0,
-                               processing_time="N/A")
+    if yolo_model is None: # Check if YOLO model loaded
+        print("!!! ERROR: YOLO model not loaded. Cannot process media.")
+        # Render results page with error
+        return render_template('results.html', prediction_status="Error: Model Not Loaded")
 
     start_time = time.time()
 
-    if 'media' not in request.files: return 'No media file part in the request', 400
+    # --- File Handling (same as before) ---
+    if 'media' not in request.files: return 'No media file part', 400
     media_file = request.files['media']
-    if media_file.filename == '': return 'No selected media file', 400
-
+    if media_file.filename == '': return 'No selected file', 400
     original_filename = secure_filename(media_file.filename)
-    # Use a timestamp or UUID to make upload filenames unique and avoid conflicts
-    unique_filename_prefix = str(int(time.time())) # Simple timestamp prefix
+    unique_filename_prefix = f"{int(time.time())}_{os.urandom(4).hex()}"
     unique_original_filename = f"{unique_filename_prefix}_{original_filename}"
-
     upload_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_original_filename)
     try:
         media_file.save(upload_path)
-        print(f"Media saved temporarily to: {upload_path}")
+        print(f"Media saved to: {upload_path}")
     except Exception as e:
         print(f"Error saving media file: {e}")
-        return f"Error saving media file: {e}", 500
-
+        return f"Error saving file: {e}", 500
 
     mimetype = mimetypes.guess_type(upload_path)[0]
     file_type = 'unknown'
@@ -461,498 +413,424 @@ def upload_media_route():
         elif mimetype.startswith('image/'): file_type = 'image'
     print(f"Detected file type: {file_type}")
 
-    # --- Initialize vars for results template ---
-    processed_media_url = None # URL for the image to display (processed image or critical frame)
-    download_video_url = None  # URL for the full video (only if video)
-    overall_processing_status = "Processing Started" # Overall status for the entire file/video
+    # --- Initialize vars ---
+    processed_media_url = None
+    download_video_url = None
+    overall_processing_status = "Processing Started"
     max_persons = 0
-    output_media_type = file_type # Use detected type for the template
+    output_media_type = file_type
 
     # --- Process Video ---
     if file_type == 'video':
-        output_video_filename = f"processed_{unique_original_filename}"
-        # Ensure video filename has an mp4 extension if it doesn't already
-        if not output_video_filename.lower().endswith('.mp4'):
-             # Remove existing extension and add .mp4
-             output_video_filename = os.path.splitext(output_video_filename)[0] + ".mp4"
-
+        base_name = os.path.splitext(f"processed_{unique_original_filename}")[0]
+        output_video_filename = f"{base_name}.mp4"
         output_video_path = os.path.join(PROCESSED_VIDEO_FOLDER, output_video_filename)
+        cap = None
+        out_video = None
 
-        cap = cv2.VideoCapture(upload_path)
+        try:
+            cap = cv2.VideoCapture(upload_path)
+            if not cap.isOpened():
+                raise IOError(f"Failed to open input video file: {upload_path}")
 
-        if not cap.isOpened():
-            print(f"!!! ERROR: Failed to open input video file: {upload_path}")
-            overall_processing_status = "Error: Could not open input video"
-            # Fall through to cleanup and render error
-        else:
-            try: # Wrap processing in a try block
-                fps = cap.get(cv2.CAP_PROP_FPS); fps = fps if fps and fps > 0 else 25.0 # Default to 25 if FPS is zero or None
-                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = cap.get(cv2.CAP_PROP_FPS); fps = fps if fps and fps > 0 else 30.0
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-                # Ensure valid dimensions
-                if width <= 0 or height <= 0:
-                    print(f"!!! ERROR: Invalid video dimensions ({width}x{height}) for {upload_path}.")
-                    overall_processing_status = "Error: Invalid video dimensions"
+            if width <= 0 or height <= 0:
+                raise ValueError(f"Invalid video dimensions ({width}x{height})")
+
+            print(f"Video Input: {width}x{height} @ {fps:.2f} FPS")
+
+            # --- Codec Selection (same as before) ---
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Default
+            try:
+                test_output_path = os.path.join(app.config['PROCESSED_VIDEO_FOLDER'], f"codec_test_{unique_filename_prefix}.mp4")
+                test_writer = cv2.VideoWriter()
+                if test_writer.open(test_output_path, cv2.VideoWriter_fourcc(*'avc1'), fps, (width, height), True):
+                    fourcc = cv2.VideoWriter_fourcc(*'avc1')
+                    print("Using avc1 (H.264) codec.")
                 else:
-                    print(f"Video Input: {width}x{height} @ {fps:.2f} FPS")
+                    print("avc1 codec not available, using mp4v.")
+                test_writer.release()
+                if os.path.exists(test_output_path): os.remove(test_output_path)
+            except Exception as codec_e:
+                print(f"Codec test failed ('avc1'): {codec_e}. Using mp4v.")
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            # --- End Codec Selection ---
 
-                    # Use 'mp4v' or 'avc1' (H.264) - 'avc1' generally offers better compression and compatibility
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Default codec
-                    # Optional: Try 'avc1' first if supported
-                    try:
-                         test_writer = cv2.VideoWriter()
-                         # Create a dummy file name for the test
-                         test_output_path = os.path.join(app.config['PROCESSED_VIDEO_FOLDER'], "codec_test_dummy.mp4")
-                         if test_writer.open(test_output_path, cv2.VideoWriter_fourcc(*'avc1'), fps, (width, height), True):
-                             fourcc = cv2.VideoWriter_fourcc(*'avc1')
-                             print("Using avc1 codec (H.264).")
-                         else:
-                             print("avc1 codec not available, using mp4v.")
-                         test_writer.release()
-                         if os.path.exists(test_output_path): os.remove(test_output_path) # Clean up dummy file
-                     # Use a broad except for codec testing as it can raise various errors
-                    except Exception as codec_e:
-                         print(f"Codec test failed ({codec_e}), using mp4v.")
-                         fourcc = cv2.VideoWriter_fourcc(*'mp4v') # Re-assign if test failed
+            out_video = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+            if not out_video.isOpened():
+                raise IOError(f"Failed to initialize VideoWriter for {output_video_path}")
 
+            print("VideoWriter opened. Processing frames...")
+            frame_num = 0
+            video_highest_status = "Normal"
+            critical_frame_content_to_save = None
+            first_processed_frame_content = None
 
-                    out_video = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-                    print(f"Attempting to open VideoWriter for: {output_video_path}")
+            # --- Process first frame (same logic as before) ---
+            ret_first, first_frame = cap.read()
+            if ret_first and first_frame is not None:
+                # Call the *updated* processing function
+                first_processed_frame_content, first_frame_status, first_persons = process_media_content(
+                    first_frame, width, height, -1, is_live_stream=False # Indicate not live stream
+                )
+                if first_processed_frame_content is not None:
+                    video_highest_status = first_frame_status
+                    critical_frame_content_to_save = first_processed_frame_content.copy()
+                    max_persons = first_persons
+                    print(f"Processed initial frame (Status: {first_frame_status})")
+            else:
+                print("Warning: Could not read the first frame.")
+            # --- End Process first frame ---
 
-                    if not out_video.isOpened():
-                        print(f"!!! ERROR: Failed to initialize VideoWriter for {output_video_path}. Check codecs and permissions.")
-                        overall_processing_status = "Error: Failed to initialize VideoWriter"
-                    else:
-                        print("VideoWriter opened successfully. Starting frame processing loop...")
-                        frame_num = 0
-                        video_highest_status = "Normal" # Track highest status found in video
-                        critical_frame_url_to_save = None # Will store the URL of the image file of the critical frame
-                        processed_first_frame_content = None # Keep processed first frame content in memory temporarily
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Reset for main loop
+            frame_num = 0
 
-                        # Process the first frame initially to have a fallback image if no detections occur
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Ensure we are at frame 0
-                        ret_first, first_frame = cap.read()
-                        if ret_first and first_frame is not None:
-                            # Process first frame to get initial status and image
-                            processed_first_frame_content, first_frame_status, _ = process_media_content(
-                                first_frame, width, height, 0, "Normal" # Process first frame with 'Normal' context
-                            )
-                            if processed_first_frame_content is not None:
-                                # This first processed frame is our initial candidate for the critical frame
-                                video_highest_status = first_frame_status
-                                # We will save this *after* the loop if no higher status frame is found
-                                print(f"Processed initial frame (Status: {video_highest_status})")
+            while True:
+                ret, frame = cap.read()
+                if not ret or frame is None: break
 
+                # Call the *updated* processing function
+                processed_frame, current_frame_status, people_count = process_media_content(
+                    frame, width, height, frame_num, is_live_stream=False # Indicate not live stream
+                )
 
-                        # Reset capture to beginning for the main loop
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                        frame_num = 0 # Reset frame counter
-                        processed_critical_frame_content = None # Store the actual frame data for the critical frame
+                if processed_frame is None:
+                    print(f"Warning: Skipping frame {frame_num} due to processing failure.")
+                    frame_num += 1
+                    continue
 
-                        while True:
-                            ret, frame = cap.read()
-                            if not ret or frame is None: break # End of video or failed read
+                # Update highest status logic (same as before)
+                new_highest_status = get_higher_priority_status(video_highest_status, current_frame_status)
+                if STATUS_HIERARCHY.get(new_highest_status, -99) > STATUS_HIERARCHY.get(video_highest_status, -99):
+                    video_highest_status = new_highest_status
+                    critical_frame_content_to_save = processed_frame.copy()
+                    print(f"New highest status '{video_highest_status}' at frame {frame_num}.")
 
-                            # Process frame (pass video_highest_status as context for display on frame, though function uses it little)
-                            # We get the *current frame's* specific status back
-                            processed_frame, current_frame_status, people_count = process_media_content(
-                                frame, width, height, frame_num, video_highest_status
-                            )
+                max_persons = max(max_persons, people_count) # Update max persons
 
-                            if processed_frame is None:
-                                print(f"Warning: Skipping frame {frame_num} due to processing failure.")
-                                frame_num += 1
-                                continue # Skip writing/analyzing this frame if processing failed
+                # Write frame (same as before)
+                try:
+                    out_video.write(processed_frame)
+                except Exception as write_e:
+                    print(f"!!! ERROR writing frame {frame_num}: {write_e}")
+                    overall_processing_status = get_higher_priority_status(overall_processing_status, f"Error: Video writing failed frame {frame_num}")
+                    break
 
-                            # Check if this frame's status is higher priority than the highest seen so far
-                            new_highest_status = get_higher_priority_status(video_highest_status, current_frame_status)
+                frame_num += 1
+                # if frame_num % 50 == 0: print(f"  Processed frame {frame_num}...")
 
-                            # If a new strictly higher status is found, update the highest status
-                            # and store this frame content as the new critical frame candidate
-                            if STATUS_HIERARCHY.get(new_highest_status, -1) > STATUS_HIERARCHY.get(video_highest_status, -1):
-                                 video_highest_status = new_highest_status
-                                 processed_critical_frame_content = processed_frame.copy() # Store the frame data
-                                 print(f"New highest status found (Status: {video_highest_status}) at frame {frame_num}. Storing frame content.")
+            print(f"Finished processing {frame_num} frames.")
+            overall_processing_status = video_highest_status # Final status
 
+        except Exception as video_proc_e:
+            print(f"!!! ERROR during video processing: {video_proc_e}")
+            overall_processing_status = get_higher_priority_status(overall_processing_status, f"Error: Video processing failed - {type(video_proc_e).__name__}")
+            processed_media_url = None
+            download_video_url = None
+            # Ensure video writer is released on error
+            if out_video and out_video.isOpened(): out_video.release()
+            # Clean up partial file
+            if os.path.exists(output_video_path):
+                try: os.remove(output_video_path)
+                except OSError: pass
 
-                            # Update max persons found in the entire video
-                            max_persons = max(max_persons, people_count)
+        finally:
+            if cap and cap.isOpened(): cap.release(); print("VideoCapture released.")
+            if out_video and out_video.isOpened(): out_video.release(); print("VideoWriter released.")
 
-                            # Write frame to the full output video
-                            try:
-                                out_video.write(processed_frame)
-                            except Exception as write_e:
-                               print(f"!!! ERROR writing frame {frame_num} to video: {write_e}")
-                               # Stop processing the video if writing fails
-                               overall_processing_status = get_higher_priority_status(overall_processing_status, f"Error: Video writing failed frame {frame_num}")
-                               break # Exit the processing loop
+        # --- Save critical frame (same logic as before) ---
+        if overall_processing_status.startswith("Error:") is False: # Only save if no major error occurred
+            frame_to_save_display = critical_frame_content_to_save if critical_frame_content_to_save is not None else first_processed_frame_content
+            if frame_to_save_display is not None:
+                critical_frame_filename = f"display_{base_name}.jpg"
+                critical_frame_path = os.path.join(PROCESSED_FRAMES_FOLDER, critical_frame_filename)
+                try:
+                    cv2.imwrite(critical_frame_path, frame_to_save_display)
+                    processed_media_url = url_for('static', filename=f'processed_frames/{critical_frame_filename}')
+                    print(f"Saved display frame to {critical_frame_path}")
+                except Exception as img_save_e:
+                    print(f"!!! ERROR saving display frame image: {img_save_e}")
+            else:
+                print("!!! WARNING: No frame content to save as display image.")
 
-                            frame_num += 1
-                            # Optional: progress update
-                            # if frame_num > 0 and frame_num % 100 == 0: print(f"  Processed frame {frame_num}...")
-
-
-                        print(f"Frame processing loop finished after {frame_num} frames.")
-                        # Final status for the video is the highest status encountered across all frames
-                        overall_processing_status = video_highest_status
-
-                        # Release VideoWriter FIRST
-                        if out_video.isOpened():
-                            out_video.release()
-                            print("VideoWriter released.")
-
-                        # --- Save the critical frame image (or fallback) ---
-                        frame_to_save = processed_critical_frame_content # Use the highest-status frame found
-                        if frame_to_save is None: # If no critical frame with a status > Normal was found
-                             frame_to_save = processed_first_frame_content # Use the processed first frame as fallback
-                             print("No higher-status frame found, using processed first frame as display image.")
-
-                        if frame_to_save is not None:
-                             critical_frame_filename = f"display_frame_{unique_filename_prefix}_{os.path.splitext(original_filename)[0]}.jpg"
-                             critical_frame_path = os.path.join(PROCESSED_FRAMES_FOLDER, critical_frame_filename)
-                             try:
-                                 cv2.imwrite(critical_frame_path, frame_to_save)
-                                 critical_frame_url_to_save = url_for('static', filename=f'processed_frames/{critical_frame_filename}')
-                                 print(f"Saved display frame (Status: {overall_processing_status}) at {critical_frame_path}")
-                             except Exception as img_save_e:
-                                 print(f"!!! ERROR saving display frame image {critical_frame_path}: {img_save_e}")
-                                 critical_frame_url_to_save = None # Ensure it's None on failure
-                        else:
-                            print("!!! WARNING: No frame content available to save as display image.")
-                            critical_frame_url_to_save = None
-
-
-                        # Check if the output video file was successfully created and is not empty
-                        if os.path.exists(output_video_path) and os.path.getsize(output_video_path) > 0:
-                             download_video_url = url_for('static', filename=f'processed_videos/{output_video_filename}')
-                             print(f"Full processed video created: {output_video_path}")
-                        else:
-                             print(f"!!! ERROR: Output video file missing or empty after processing: {output_video_path}")
-                             overall_processing_status = get_higher_priority_status(overall_processing_status, "Error: Output video generation failed")
-                             # If video creation failed, the download URL will be None
-
-                # End of else (valid dimensions) block
-            except Exception as video_proc_e:
-                print(f"!!! ERROR during video processing: {video_proc_e}")
-                overall_processing_status = get_higher_priority_status(overall_processing_status, f"Error: Unexpected failure during video processing - {video_proc_e}")
-                # Try to cleanup partially written video file if it exists
-                if os.path.exists(output_video_path):
-                     try:
-                         os.remove(output_video_path)
-                         print(f"Removed incomplete video file: {output_video_path}")
-                     except OSError as cleanup_e:
-                         print(f"Warning: Could not remove incomplete video file {output_video_path}: {cleanup_e}")
-
-            finally:
-                # Ensure VideoCapture is released
-                if cap.isOpened(): cap.release(); print("VideoCapture released.")
-
-        # Assign the URL of the critical frame image (or initial frame fallback) for display
-        processed_media_url = critical_frame_url_to_save
-
+        # --- Check output video (same logic as before) ---
+        if os.path.exists(output_video_path) and os.path.getsize(output_video_path) > 1024:
+            download_video_url = url_for('static', filename=f'processed_videos/{output_video_filename}')
+            print(f"Full processed video available: {output_video_path}")
+        else:
+             # Only flag as error if no other major error already occurred
+            if not overall_processing_status.startswith("Error:"):
+                 print(f"!!! WARNING: Output video file missing or empty: {output_video_path}")
+                 overall_processing_status = get_higher_priority_status(overall_processing_status, "Error: Output video generation failed")
+            download_video_url = None
+            if os.path.exists(output_video_path): # Clean up empty file
+                try: os.remove(output_video_path)
+                except OSError: pass
+        # --- End Process Video ---
 
     # --- Process Image ---
     elif file_type == 'image':
-        output_image_filename = f"processed_{unique_original_filename}"
-        # Ensure filename ends with a common image extension
-        # Get original extension or default to jpg if unknown/missing
-        ext = os.path.splitext(unique_original_filename)[1].lower()
-        if ext not in ('.png', '.jpg', '.jpeg', '.bmp', '.tiff'):
-             ext = ".jpg" # Default to jpg
-
-        output_image_filename = os.path.splitext(output_image_filename)[0] + ext
+        # (This section remains largely the same, just calls the updated process_media_content)
+        original_ext = os.path.splitext(original_filename)[1].lower()
+        if original_ext not in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']: original_ext = '.jpg'
+        base_name = os.path.splitext(f"processed_{unique_original_filename}")[0]
+        output_image_filename = f"{base_name}{original_ext}"
         output_image_path = os.path.join(PROCESSED_IMAGE_FOLDER, output_image_filename)
 
         try:
             image = cv2.imread(upload_path)
-            if image is None:
-               raise ValueError("Could not read image file with OpenCV.")
-            height, width = image.shape[:2] # Get height and width
-
+            if image is None: raise ValueError("Could not read image file.")
+            height, width = image.shape[:2]
             print(f"Image Input: {width}x{height}")
 
-            # Process the single image (frame_index=0, status starts 'Normal')
+            # Call the *updated* processing function
             processed_image, image_status, people_count = process_media_content(
-                image, width, height, 0, "Normal" # Process image with 'Normal' context
+                image, width, height, 0, is_live_stream=False # Indicate not live stream
             )
 
-            if processed_image is None:
-               raise ValueError("Image processing function returned None.")
+            if processed_image is None: raise ValueError("Processing returned None.")
 
-            overall_processing_status = image_status # Overall status is just the result of this one image
+            overall_processing_status = image_status
             max_persons = people_count
 
-            # Save the processed image
             save_success = cv2.imwrite(output_image_path, processed_image)
-            if not save_success:
-                raise ValueError(f"Failed to save processed image to {output_image_path}. Check permissions.")
+            if not save_success: raise ValueError("Failed to save processed image.")
 
             print(f"Processed image saved to: {output_image_path}")
             processed_media_url = url_for('static', filename=f'processed_images/{output_image_filename}')
-            download_video_url = None # No video to download for image upload
-
+            download_video_url = None
 
         except Exception as img_proc_e:
            print(f"!!! ERROR during image processing: {img_proc_e}")
-           overall_processing_status = get_higher_priority_status(overall_processing_status, f"Error: Image processing failed - {img_proc_e}")
-           processed_media_url = None # Indicate failure
+           overall_processing_status = get_higher_priority_status(overall_processing_status, f"Error: Image processing failed - {type(img_proc_e).__name__}")
+           processed_media_url = None
            download_video_url = None
+        # --- End Process Image ---
 
-
-    # --- Handle Unknown File Type ---
+    # --- Handle Unknown File Type (same as before) ---
     else:
-        print(f"Unsupported file type: {mimetype}")
+        print(f"Unsupported file type: {mimetype or 'Unknown'}")
         overall_processing_status = "Error: Unsupported file type"
         processed_media_url = None
         download_video_url = None
 
-    # --- Cleanup Upload ---
+    # --- Cleanup Upload (same as before) ---
     try:
-        os.remove(upload_path)
-        print(f"Removed temporary upload: {upload_path}")
+        if os.path.exists(upload_path):
+            os.remove(upload_path)
+            print(f"Removed temporary upload: {upload_path}")
     except OSError as e:
         print(f"Warning: Could not remove temporary upload {upload_path}: {e}")
-    except Exception as e:
-        print(f"Warning: Unexpected error removing temporary upload {upload_path}: {e}")
-
 
     processing_time_secs = time.time() - start_time
-    print(f"Total request processing time: {processing_time_secs:.2f} seconds")
+    print(f"Total upload processing time: {processing_time_secs:.2f} seconds")
 
-    # --- Render Results ---
+    # --- Render Results (same as before) ---
     print(f"---> Rendering results page:")
     print(f"     Media Type: {output_media_type}")
-    print(f"     Displayed Media URL (Image/Critical Frame): {processed_media_url}")
+    print(f"     Displayed Media URL: {processed_media_url}")
     print(f"     Download Video URL: {download_video_url}")
     print(f"     Overall Status: {overall_processing_status}")
-    print(f"     Max Persons: {max_persons}")
+    print(f"     Max Persons Detected: {max_persons}")
 
-    # Pass relevant data to the results template
     return render_template('results.html',
                            output_media_type=output_media_type,
-                           processed_media_url=processed_media_url, # This is the image URL to DISPLAY
-                           download_video_url=download_video_url,   # This is the video URL for DOWNLOAD (or None)
+                           processed_media_url=processed_media_url,
+                           download_video_url=download_video_url,
                            prediction_status=overall_processing_status,
                            max_persons=max_persons,
                            processing_time=f"{processing_time_secs:.2f}")
 
 
-# --- Live Stream Route ---
+# --- Live Stream Video Feed Route (UPDATED FOR YOLO) ---
 def generate_live_frames():
+    """Generator for processing and yielding live video frames using YOLO."""
     print("\n--- Request received for /video_feed (Live Stream) ---")
-    if fluvio_producer:
-         print("   Fluvio Status: Producer is active.")
-    else:
-         print("   Fluvio Status: Producer is INACTIVE.")
-    sys.stdout.flush()
+    connect_fluvio()
 
-    # Check if model is loaded for the live stream
-    if detector is None:
-        print("!!! ERROR: ML model not loaded. Cannot start live stream.")
-        # Yield an error image frame instead of processing frames
-        error_msg = "ML Model Loading Failed. Cannot stream."
-        # Attempt to get resolution if possible, else default
-        width, height = 640, 480
-        try:
-            # If cap could be opened just to get dimensions, use them
-            temp_cap = cv2.VideoCapture(0) # Try opening briefly
-            if temp_cap.isOpened():
-                 width = int(temp_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                 height = int(temp_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                 temp_cap.release()
-        except Exception as dim_e:
-            print(f"Warning: Could not get camera dimensions: {dim_e}. Using default {width}x{height}.")
+    live_cap = None
 
-        blank_img = np.zeros((height, width, 3), dtype=np.uint8) # Create a black image
-        # Add red error text - scale font based on width
-        font_scale = min(width, height) / 600.0 # Adjust font scale based on resolution
-        cv2.putText(blank_img, error_msg, (int(width*0.05), int(height/2)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), 2, cv2.LINE_AA) # Add red error text
-        ret_enc, buffer = cv2.imencode('.jpg', blank_img)
-        if ret_enc:
-             yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-        # Optional: Yield a few times or sleep to keep the error visible before ending
-        # for _ in range(3): # Yield 3 times
-        #     yield (b'--frame\r\n'
-        #            b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-        #     time.sleep(0.1)
-        return # Stop the generator after yielding error frame
-
-    # --- Webcam/Video Source Handling ---
-    # Try default camera (0) first on Windows. Add backend hints if needed.
-    # If 0 doesn't work, try 1, 2 etc. Experiment or let the code try the fallback.
-    # live_cap = cv2.VideoCapture(0 + cv2.CAP_DSHOW) # Explicitly use DirectShow
-    # live_cap = cv2.VideoCapture(0 + cv2.CAP_MSMF) # Explicitly use Media Foundation
-    live_cap = cv2.VideoCapture(0) # Standard attempt first
-
-    # Fallback to video file if webcam fails
-    if not live_cap.isOpened():
-        print("!!! WARNING: Cannot open default video source (webcam 0). Attempting to use videoplayback.mp4...")
-        # Ensure the fallback video file exists! Place videoplayback.mp4 next to app.py
-        fallback_video_path = "videoplayback.mp4"
-        if os.path.exists(fallback_video_path):
-             live_cap = cv2.VideoCapture(fallback_video_path)
-             if not live_cap.isOpened():
-                  print(f"!!! ERROR: Failed to open fallback video file: {fallback_video_path}")
-             else:
-                  print(f"Successfully opened fallback video: {fallback_video_path}")
-        else:
-             print(f"!!! ERROR: Fallback video file not found: {fallback_video_path}")
-
-
-    # If neither webcam nor fallback video opened
-    if not live_cap.isOpened():
-        print("!!! ERROR: Cannot open any video source (webcam/file).")
-        error_msg = "Cannot open video source."
-        # Default dimensions if unable to get them
-        width, height = 640, 480
-        try: # Attempt to get some default dimensions if possible
-             temp_cap = cv2.VideoCapture(0) # Try opening briefly
-             if temp_cap.isOpened():
-                 width = int(temp_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                 height = int(temp_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                 temp_cap.release()
-        except Exception as dim_e:
-            print(f"Warning: Could not get camera dimensions for error frame: {dim_e}. Using default {width}x{height}.")
-
-        blank_img = np.zeros((height, width, 3), dtype=np.uint8) # Create black image
+    # Helper to yield error frame (same as before)
+    def yield_error_frame(message="Error", width=640, height=480):
+        blank_img = np.zeros((height, width, 3), dtype=np.uint8)
         font_scale = min(width, height) / 600.0
-        cv2.putText(blank_img, error_msg, (int(width*0.05), int(height/2)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), 2, cv2.LINE_AA) # Add red error text
+        (tw, th), _ = cv2.getTextSize(message, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)
+        text_x = max(10, int(width/2 - tw/2)) # Ensure text starts within bounds
+        text_y = int(height/2 + th/2)
+        draw_text_with_bg(blank_img, message, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,255), (0,0,0), 2, 5, 0.7)
         ret_enc, buffer = cv2.imencode('.jpg', blank_img)
         if ret_enc:
-             yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-        # time.sleep(0.5)
-        return # Stop the generator
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
-    # Source successfully opened (either webcam or video file)
-    frame_width = int(live_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    frame_height = int(live_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # Check if YOLO model is loaded
+    if yolo_model is None:
+        print("!!! ERROR: YOLO model not loaded. Cannot start live stream.")
+        # Update shared status for SSE
+        with live_status_lock:
+            live_status_data["status"] = "Error: Model Not Loaded"
+            live_status_data["persons"] = 0
+        status_update_queue.put(True) # Signal update
+        yield from yield_error_frame("ML Model Load Failed")
+        return
 
-    # Final check for valid dimensions just in case
-    if frame_width <= 0 or frame_height <= 0:
-         print("!!! ERROR: Invalid frame dimensions from opened video source.")
-         live_cap.release()
-         error_msg = "Invalid video source dimensions."
-         # Fallback to a default sized error image
-         blank_img = np.zeros((480, 640, 3), dtype=np.uint8)
-         font_scale = min(640, 480) / 600.0
-         cv2.putText(blank_img, error_msg, (int(640*0.05), int(480/2)), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), 2, cv2.LINE_AA)
-         ret_enc, buffer = cv2.imencode('.jpg', blank_img)
-         if ret_enc:
-             yield (b'--frame\r\n'
-                    b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-         # time.sleep(0.5)
-         return
+    # --- Open Video Source (same logic as before) ---
+    try:
+        live_cap = cv2.VideoCapture(0) # Try default webcam
+        source_desc = "default webcam (0)"
+        if not live_cap.isOpened():
+            print(f"Warning: Cannot open {source_desc}. Trying fallback...")
+            fallback_video_path = "videoplayback.mp4"
+            if os.path.exists(fallback_video_path):
+                live_cap = cv2.VideoCapture(fallback_video_path)
+                source_desc = f"fallback video ({fallback_video_path})"
+                if live_cap.isOpened(): print(f"Using {source_desc}")
+                else: raise IOError("Failed to open fallback video.")
+            else:
+                raise IOError("Fallback video not found and webcam failed.")
 
+        frame_width = int(live_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_height = int(live_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        if frame_width <= 0 or frame_height <= 0:
+            raise ValueError(f"Invalid dimensions from {source_desc}")
 
-    print(f"Live source opened: {frame_width}x{frame_height}")
+        print(f"Live stream started ({source_desc}): {frame_width}x{frame_height}")
 
-    frame_num = 0
-    overall_stream_status = "Normal" # Track highest status seen *during* the current stream session
-
-    while True:
-        ret, frame = live_cap.read()
-        # Loop video if using a file source for "live" demo
-        if not ret or frame is None:
-            # If using a video file, loop it
-            if live_cap.get(cv2.CAP_PROP_POS_FRAMES) > 0: # Check if we read at least one frame
-                 live_cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Set frame position back to beginning
-                 print("Looping video source...")
-                 ret, frame = live_cap.read() # Read the first frame again
-            # If it's still not ret or frame is None (e.g., camera disconnected, empty file)
+        # --- Frame Processing Loop ---
+        frame_num = 0
+        while True:
+            ret, frame = live_cap.read()
             if not ret or frame is None:
-                print("End of live stream source (or camera disconnected). Stopping generator.")
-                break # Really end the stream
+                # Handle end of video file (looping) or camera error
+                is_file_source = live_cap.get(cv2.CAP_PROP_POS_AVI_RATIO)
+                if is_file_source is not None and is_file_source != -1 and live_cap.get(cv2.CAP_PROP_POS_FRAMES) > 0:
+                    print("Looping video source...")
+                    live_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    continue # Go to next iteration to read the first frame again
+                else:
+                    print("End of live stream source or read error.")
+                    break # Exit loop
 
-        # Process frame (pass overall_stream_status as context for display on frame)
-        # We get the *current frame's* specific status back
-        processed_frame, frame_status, _ = process_media_content(
-            frame, frame_width, frame_height, frame_num, overall_stream_status
-        )
+            # Call the *updated* processing function, indicating it's for live stream
+            processed_frame, frame_status, people_count = process_media_content(
+                frame, frame_width, frame_height, frame_num, is_live_stream=True
+            )
 
-        # Update the overall highest status for the stream session
-        overall_stream_status = get_higher_priority_status(overall_stream_status, frame_status)
+            if processed_frame is None:
+                print(f"Warning: Skipping live frame {frame_num} processing failure.")
+                frame_num += 1
+                continue
 
-        if processed_frame is None:
-            print(f"Warning: Skipping live frame {frame_num} due to processing failure.")
-            frame_num += 1
-            continue # Skip encoding/yielding this frame
-
-
-        try:
-            # Encode processed frame as JPEG for streaming (MJPEG format)
+            # Encode and yield frame (same as before)
             ret_enc, buffer = cv2.imencode('.jpg', processed_frame)
             if not ret_enc:
                 print(f"Error encoding live frame {frame_num}.")
                 frame_num += 1
-                continue # Skip if encoding fails
-
+                continue
             frame_bytes = buffer.tobytes()
-            # Yield the frame in a multi-part response required for MJPEG streaming
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
-        except Exception as e:
-            print(f"Error encoding/yielding live frame {frame_num}: {e}")
-            # Consider yielding an error frame before breaking in a more robust app
-            break # Stop stream on error
+            frame_num += 1
+            # time.sleep(0.01) # Optional delay
 
-        frame_num += 1
-        # Optional: Add a small delay if processing is too fast and consuming excessive CPU/bandwidth
-        # time.sleep(0.01) # Example: 10ms delay results in max ~100 FPS yield
-
-
-    # Ensure capture is released when the generator stops
-    live_cap.release()
-    print("Live stream generator finished.")
+    except Exception as live_err:
+        print(f"!!! ERROR during live stream generation: {live_err}")
+        err_msg = f"Stream Error: {type(live_err).__name__}"
+        # Update shared status for SSE
+        with live_status_lock:
+            live_status_data["status"] = err_msg
+            live_status_data["persons"] = 0
+        status_update_queue.put(True) # Signal update
+        yield from yield_error_frame(err_msg) # Yield error frame to client
+    finally:
+        if live_cap and live_cap.isOpened():
+            live_cap.release()
+        print("Live stream generator finished.")
+         # Signal potential end of stream status update
+        with live_status_lock:
+            live_status_data["status"] = "Stream Ended"
+            live_status_data["persons"] = 0
+        status_update_queue.put(True)
 
 
 @app.route('/live')
 def live_route():
-    """Serves the live stream page."""
-    # Attempt Fluvio connection before rendering the live page
-    connect_fluvio()
+    """Serves the live stream page (live.html)."""
+    connect_fluvio() # Optional
     return render_template('live.html')
 
 @app.route('/video_feed')
 def video_feed_route():
-    """Provides the MJPEG stream for the live page."""
-    # The generator function generate_live_frames handles the actual frame processing and yielding
+    """Provides the MJPEG video stream."""
     return Response(generate_live_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# --- Run App ---
-if __name__ == '__main__':
-    print("--- Initializing Application ---")
-    # Attempt to connect to Fluvio when the application starts
-    # This connection will persist for the lifetime of the process
-    fluvio_connected = connect_fluvio()
-    if not fluvio_connected:
-         print("!!! WARNING: Fluvio connection failed on startup. Data will not be sent.")
-    else:
-         print("+++ Fluvio connection successful on startup.")
 
-    # Attempt to load the ML model on startup
-    # The global 'detector' variable is set by the initial load attempt.
-    # Error handling for missing detector is present in processing functions.
-    if detector is None:
-        print("!!! WARNING: ML model failed to load on startup. Media processing and live streams will not work.")
-
-    print("--- Starting Flask Server ---")
-    # use_reloader=False is important with background threads/connections (like Fluvio)
-    # threaded=True is needed for handling concurrent requests (like /upload_media and /video_feed simultaneously)
-    # host='0.0.0.0' makes the server accessible from external IPs
-    # debug=True enables Flask's debug mode (auto-reloads on code changes - potentially conflicts with use_reloader=False, but good for development logs)
-    # Setting TF log level again just before run in case something resets it
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-    # Use a try-except block around app.run to catch startup errors gracefully
+# --- Server-Sent Events (SSE) Route for Live Status ---
+def generate_status_updates():
+    """Generator function to send live status updates via SSE."""
+    print("SSE client connected for status updates.")
+    last_sent_status = None # Keep track of last sent data to avoid redundant messages
     try:
+        while True:
+            # Block until a status update is signaled via the queue
+            status_update_queue.get() # Wait for a signal
+            current_status = None
+            with live_status_lock: # Get the latest status safely
+                current_status = live_status_data.copy()
+
+            # Only send if the status or person count has changed
+            if current_status != last_sent_status:
+                json_data = json.dumps(current_status)
+                yield f"data: {json_data}\n\n" # SSE format
+                last_sent_status = current_status
+                # print(f"SSE Update Sent: {json_data}") # Debug log
+            status_update_queue.task_done() # Mark queue item as processed
+
+            # Add a small sleep to prevent overly tight loops if many signals arrive quickly
+            time.sleep(0.1)
+
+    except GeneratorExit:
+         print("SSE client disconnected.")
+    finally:
+         print("SSE status update generator finished.")
+         # Ensure queue is cleared if generator exits unexpectedly
+         while not status_update_queue.empty():
+            try:
+                status_update_queue.get_nowait()
+                status_update_queue.task_done()
+            except Exception:
+                break
+
+
+@app.route('/stream_status')
+def stream_status_route():
+    """Provides the SSE stream for live status updates."""
+    return Response(generate_status_updates(), mimetype='text/event-stream')
+
+
+# --- Run Application ---
+if __name__ == '__main__':
+    print("--- Initializing Stampede Prediction Application (YOLOv8) ---")
+
+    connect_fluvio() # Optional Fluvio connect on startup
+
+    if yolo_model is None:
+        print("!!! WARNING: YOLO model failed to load. Processing will fail.")
+    else:
+        print("+++ YOLO model appears loaded.")
+
+    print("--- Starting Flask Development Server ---")
+    try:
+        # Use debug=False for production
         app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False, threaded=True)
     except Exception as run_e:
         print(f"!!! FATAL ERROR: Flask application failed to start: {run_e}")
     finally:
-        os.environ.pop('TF_CPP_MIN_LOG_LEVEL', None) # Clean up env variable on exit
         print("--- Application Shutting Down ---")
 
