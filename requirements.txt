@@ -1,0 +1,8 @@
+Flask
+opencv-python
+ultralytics
+numpy
+fluvio
+werkzeug
+mimetypes
+shutil
