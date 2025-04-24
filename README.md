@@ -45,7 +45,7 @@ The primary objective of the Stampede Predictor project is to develop and deploy
 - Jany Sabarinath
 
 - Vrindha P
-  
+
 
 ### Your Approach:
 
@@ -138,6 +138,7 @@ Add images, GIFs, or screenshots if helpful!
 
 ### Requirements:
 
+- Operating System: Linux or macOS (Recommended)
 - Python 3.7+
 - pip (Python package installer)
 - Fluvio Cluster (Running locally or accessible)
@@ -186,7 +187,7 @@ Add images, GIFs, or screenshots if helpful!
     fluvio topic create crowd-data
     ```
 
-5.  **Run the Fluvio Consumer (Optional but Highly Recommended for Monitoring):**
+5.  **Run the Fluvio Consumer:**
     Open a **new terminal window** separate from where you will run the Flask app. Activate the virtual environment (steps from step 2). Then run the consumer script:
 
     ```bash
