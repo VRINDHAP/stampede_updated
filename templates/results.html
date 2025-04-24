@@ -1,118 +1,400 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-    <title>Processing Results</title>
-    <link rel="icon" href="{{ url_for('static', filename='StampedeAi_lcon.png') }}" type="image/png"> <style>
-        /* Your CSS styles */
-        body { font-family: sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; color: #333;} /* [cite: 376] */
-        .container { max-width: 900px; margin: 20px auto; background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); } /* [cite: 377, 378] */
-        h1, h2 { text-align: center; color: #333; margin-top: 0;} /* [cite: 379] */
-        h1 { margin-bottom: 20px; } /* [cite: 380] */
+  <meta charset="UTF-8">
+  <title>Processing Results</title>
+  <link rel="icon" href="{{ url_for('static', filename='StampedeAi_lcon.png') }}" type="image/png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap');
 
-        /* Style for video and image display */
-        video, img { display: block; margin: 20px auto; max-width: 100%; height: auto; border: 1px solid #ccc; background-color: #000; object-fit: contain; } /* [cite: 381, 382] */
-        img { max-height: 70vh; /* Limit max height for large images */ } /* [cite: 383] */
+    :root {
+        --status-low-bg: #ecfdf5;
+        --status-low-fg: #047857;
+        --status-low-border: #a7f3d0;
 
-        /* Status container styling */
-        .status-container { text-align: center; margin-bottom: 20px; padding: 15px; border-radius: 5px; } /* [cite: 384] */
-        .status-normal { background-color: #e7f4e4; color: #2b7c2f; border: 1px solid #b7d4ae; } /* [cite: 385] */
-        .status-detected { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; } /* Used for High Density Cell Detected */ /* [cite: 386] */
-        .status-warning { background-color: #fff3cd; color: #c57d07; border: 1px solid #ffeeba; } /* Used for High Density Warning */ /* [cite: 387] */
-        .status-critical { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; font-weight: bold; } /* Used for Critical Density Detected, CRITICAL RISK, and Errors */ /* [cite: 388] */
+        --status-moderate-bg: #fef9c3; /* Lighter yellow */
+        --status-moderate-fg: #a16207; /* Darker yellow/brown */
+        --status-moderate-border: #fde68a;
 
-        /* Metrics styling */
-        .metrics p { text-align: center; font-size: 0.9em; color: #555; margin-top: 10px; margin-bottom: 20px;} /* [cite: 389] */
+        --status-high-bg: #fee2e2;
+        --status-high-fg: #b91c1c;
+        --status-high-border: #fca5a5;
 
-        /* Link and button styling */
-        a { color: #007bff; text-decoration: none; } /* [cite: 390] */
-        a:hover { text-decoration: underline; } /* [cite: 391] */
-        .back-link { display: block; text-align: center; margin-top: 30px; } /* [cite: 392] */
-        .download-button {
-            display: block; /* [cite: 393] */
-            width: fit-content;
-            margin: 20px auto;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            text-align: center; /* [cite: 394] */
-            text-decoration: none;
-            font-size: 1em;
-            transition: background-color 0.3s ease;
-        }
-         .download-button:hover {
-            background-color: #0056b3; /* [cite: 395] */
-         }
-         .error-message {
-            text-align: center; /* [cite: 396] */
-            color: red;
-            margin-top: 20px;
-            font-weight: bold;
-         }
+        --status-critical-bg: #fca5a5; /* More intense red background */
+        --status-critical-fg: #7f1d1d; /* Darker red text */
+        --status-critical-border: #dc2626; /* Stronger border */
 
-    </style>
+        --button-primary-bg: #3b82f6;
+        --button-primary-hover-bg: #2563eb;
+        --button-secondary-bg: #6b7280; /* Grey for secondary actions */
+        --button-secondary-hover-bg: #4b5563;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(to right, #eef2ff, #e0f2fe);
+      color: #1e293b;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin: 0 0 15px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #0f172a;
+    }
+
+    h2 {
+      font-size: 1.3rem;
+      color: #1d4ed8; /* Keep blue for section titles */
+    }
+
+    .status-container {
+      text-align: center;
+      padding: 20px;
+      border-radius: 12px;
+      font-weight: 600;
+      margin-bottom: 30px;
+      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+      border: 1px solid transparent; /* Start with transparent border */
+    }
+
+    /* Status styling using CSS variables */
+    .status-low {
+      background-color: var(--status-low-bg);
+      color: var(--status-low-fg);
+      border-color: var(--status-low-border);
+    }
+
+    .status-moderate {
+      background-color: var(--status-moderate-bg);
+      color: var(--status-moderate-fg);
+      border-color: var(--status-moderate-border);
+    }
+
+    .status-high {
+      background-color: var(--status-high-bg);
+      color: var(--status-high-fg);
+      border-color: var(--status-high-border);
+    }
+
+    .status-critical {
+      background-color: var(--status-critical-bg);
+      color: var(--status-critical-fg);
+      border: 2px solid var(--status-critical-border); /* Thicker border for critical */
+    }
+
+    .status-title {
+        font-size: 1.1rem; /* Slightly smaller title inside status box */
+        margin-bottom: 8px;
+        color: inherit; /* Inherit color from parent */
+    }
+
+    .risk-badge {
+      font-size: 1.2rem; /* Slightly larger badge text */
+      font-weight: bold;
+    }
+
+    /* Metrics Section */
+    .metrics {
+      text-align: center;
+      padding: 15px 0;
+      margin-top: 20px;
+      border-top: 1px solid #e5e7eb; /* Separator line */
+    }
+
+    .metrics p {
+      font-size: 0.95rem;
+      color: #475569;
+      margin: 10px 0; /* Reduced margin */
+    }
+    .metrics strong {
+        color: #1e293b; /* Darker color for metric values */
+    }
+
+    /* Media Display Area */
+    .media-display {
+        text-align: center; /* Center content */
+        min-height: 100px; /* Ensure container has height while loading */
+        position: relative; /* Needed for spinner positioning */
+    }
+
+    .media-display img,
+    .media-display video {
+      display: none; /* Hidden until loaded */
+      margin: 20px auto;
+      max-width: 100%;
+      max-height: 65vh; /* Adjusted max height */
+      border-radius: 12px;
+      border: 1px solid #ccc;
+      object-fit: contain;
+    }
+
+    /* Simple CSS Spinner */
+    .spinner {
+        border: 5px solid #f3f3f3; /* Light grey */
+        border-top: 5px solid var(--button-primary-bg); /* Blue */
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        animation: spin 1.5s linear infinite;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: block; /* Shown by default */
+    }
+
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Button Styles */
+    .button { /* General button class */
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      display: inline-block; /* Changed from block */
+      margin: 10px 5px; /* Add some margin around buttons */
+      text-align: center;
+      text-decoration: none;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+    .button:hover {
+        transform: scale(1.03);
+    }
+
+    .button-primary { /* Download button style */
+        background-color: var(--button-primary-bg);
+    }
+    .button-primary:hover {
+        background-color: var(--button-primary-hover-bg);
+    }
+
+    .button-secondary { /* Back/Play Alert button style */
+        background-color: var(--button-secondary-bg);
+    }
+    .button-secondary:hover {
+        background-color: var(--button-secondary-hover-bg);
+    }
+
+    .button-audio { /* Specific style for audio button */
+        padding: 8px 15px; /* Smaller padding */
+        font-size: 0.9rem;
+    }
+
+
+    .action-area { /* Container for buttons */
+        text-align: center;
+        margin-top: 25px;
+    }
+
+    .error-message {
+      text-align: center;
+      color: #dc2626;
+      font-weight: bold;
+      margin-top: 20px;
+      background-color: #fee2e2;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #fca5a5;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Media Processing Results</h1>
 
-        <div class="status-container
-            {% if 'CRITICAL RISK' in prediction_status %} status-critical
-            {% elif 'Critical Density Cell Detected' in prediction_status %} status-critical /* Treat single critical cell same as critical risk for visual status */
-            {% elif 'Warning' in prediction_status %} status-warning {% elif 'Detected' in prediction_status %} status-detected /* Treat single high density cell same as detected */ {% elif 'Error' in prediction_status %} status-critical /* Style errors critically */
-            {% else %} status-normal
-            {% endif %}
-        " id="status-container">
-             <h2>Overall Risk Status: {{ prediction_status | default('Analysis Incomplete') }}</h2> <input type="hidden" id="prediction-status" value="{{ prediction_status | default('') }}"> </div>
+  <div class="container">
+    <h1>📊 Media Analysis Result</h1>
 
-        {% if processed_media_url %}
-            {% if output_media_type == 'video' %}
-                <h2>Most Critical Frame from Video Analysis</h2>
-                <img src="{{ processed_media_url }}" alt="Critical Frame from Video Analysis"> <p style="text-align:center; font-size:0.9em; color:#666;">(Analysis derived from the entire video)</p> {% if download_video_url %}
-                    <a href="{{ download_video_url }}" download class="download-button">Download Full Processed Video</a> {% else %}
-                     <p class="error-message">Note: Full processed video file was not successfully generated.</p> {% endif %}
+    {# --- Determine Status Class and Labels --- #}
+    {% set status_class = 'status-low' %}
+    {% set density_label = 'Low Crowd Density' %}
+    {% set critical_status = false %}
+    {% if 'CRITICAL RISK' in prediction_status %}
+        {% set status_class = 'status-critical' %}
+        {% set density_label = 'Critical Risk Detected' %}
+        {% set critical_status = true %}
+    {% elif 'Critical Density Cell Detected' in prediction_status %}
+        {% set status_class = 'status-high' %} {# Use High status for detected critical cells #}
+        {% set density_label = 'High Crowd Density (Critical Cells Present)' %}
+        {% set critical_status = true %}
+    {% elif 'Warning' in prediction_status %}
+        {% set status_class = 'status-moderate' %}
+        {% set density_label = 'Moderate Crowd Density (Warning)' %}
+    {% elif 'Detected' in prediction_status %}
+        {% set status_class = 'status-moderate' %}
+        {% set density_label = 'Moderate Crowd Density' %}
+    {% elif 'Error' in prediction_status %}
+        {% set status_class = 'status-error' %} {# Add an error class if needed #}
+        {% set density_label = 'Processing Error' %}
+    {% endif %}
 
-            {% elif output_media_type == 'image' %}
-                <h2>Processed Image</h2>
-                <img src="{{ processed_media_url }}" alt="Processed Image"> {% else %} <p class="error-message">Unknown media type processed, but an output image is available.</p>
-                 <img src="{{ processed_media_url }}" alt="Processed Media">
-                 {% endif %} <div class="metrics">
-                  <p>Max Persons Detected: {{ max_persons | default('N/A') }} | Processing Time: {{ processing_time | default('N/A') }} seconds</p> </div>
+    {# --- Status Display --- #}
+    <div class="status-container {{ status_class }}" id="status-container">
+      <div class="status-title">Overall Risk Assessment:</div>
+      <div class="risk-badge">{{ density_label }}</div>
+      {# Hidden input to pass status to JS #}
+      <input type="hidden" id="prediction-status" value="{{ prediction_status | default('') }}">
+      <input type="hidden" id="is-critical" value="{{ 'true' if critical_status else 'false' }}">
+    </div>
 
+    {# --- Media Display --- #}
+    <section class="media-display" aria-live="polite">
+      <div id="media-loader" class="spinner"></div> {# Loading Spinner #}
+
+      {% if processed_media_url %}
+        {% if output_media_type == 'video' %}
+          <h2>🖼️ Analysis Snapshot</h2>
+          <img id="result-media" src="{{ processed_media_url }}" alt="Analysis snapshot - Loading..." style="display: none;">
+          <p style="text-align:center; font-size:0.9em; color:#64748b;">
+            This image shows the frame from the video where the highest stampede risk was detected.
+          </p>
+        {% elif output_media_type == 'image' %}
+          <h2>🖼️ Processed Image</h2>
+          <img id="result-media" src="{{ processed_media_url }}" alt="Processed image - Loading..." style="display: none;">
         {% else %}
-             <p class="error-message">Media processing failed or no output image could be generated.</p> {% if 'Error' in prediction_status %}
-                 <p class="error-message" style="font-size:0.9em;">Details: {{ prediction_status }}</p>
-             {% endif %} {% endif %}
+          <p class="error-message">Unknown media type processed.</p> {# Handle unknown type #}
+          <img id="result-media" src="{{ processed_media_url }}" alt="Processed media - Loading..." style="display: none;">
+        {% endif %}
+      {% else %}
+        <p class="error-message">⚠️ Media processing failed or no visual output generated.</p>
+        {% if 'Error' in prediction_status %}
+          {# NOTE: Pass specific error detail from backend if possible #}
+          <p class="error-message" style="font-size:0.9em;">Details: {{ prediction_status }}</p>
+        {% endif %}
+        {# Hide spinner if there's definitely no media URL #}
+        <script>document.getElementById('media-loader').style.display = 'none';</script>
+      {% endif %}
+    </section>
 
-        <p class="back-link"><a href="{{ url_for('index_route') }}">Process another file or view live stream</a></p> </div>
+    {# --- Metrics --- #}
+    <section class="metrics">
+      <p>👥 Max Persons Detected: <strong>{{ max_persons | default('N/A') }}</strong></p>
+      <p>⏱️ Processing Time: <strong>{{ processing_time | default('N/A') }}</strong> seconds</p>
+    </section>
 
-    <audio id="criticalBeep" src="{{ url_for('static', filename='beep.mp3') }}" preload="auto"></audio> <script>
-        // Get the status from the hidden input
-        const predictionStatusElement = document.getElementById('prediction-status'); // [cite: 405]
-        const audioElement = document.getElementById('criticalBeep'); // [cite: 405]
+    {# --- Action Buttons Area --- #}
+    <div class="action-area">
+        {% if output_media_type == 'video' %}
+            {% if download_video_url %}
+              <a href="{{ download_video_url }}" download class="button button-primary">⬇️ Download Full Processed Video</a>
+            {% else %}
+              <p class="error-message">⚠️ Full processed video could not be generated.</p>
+              {# Optionally add specific error detail from backend here #}
+            {% endif %}
+        {% endif %}
 
-        if (predictionStatusElement && audioElement) {
-            const predictionStatus = predictionStatusElement.value;
+        {# Always show back button #}
+        <a href="{{ url_for('index_route') }}" class="button button-secondary">← Go Back</a>
 
-            // Check if the status indicates a critical risk level
-            // Use includes() for flexibility with different critical status strings
-            if (predictionStatus.includes('CRITICAL RISK') || predictionStatus.includes('Critical Density Cell Detected')) { // [cite: 405]
-                // Attempt to play the sound
-                audioElement.play().catch(error => {
-                    // Catch potential errors, e.g., browser autoplay policies blocking the sound. [cite: 406]
-                    console.warn('Autoplay prevented critical beep sound:', error);
-                    // You might inform the user they need to interact with the page first.
-                    // Example: Display a message like "Click anywhere to enable sound alerts."
-                });
-                // Optional: Loop the sound if you want it to continue beeping [cite: 407]
-                // audioElement.loop = true; [cite: 408]
+        {# Show Play Alert button only if status is critical/high #}
+        {% if critical_status %}
+            <button id="playAlertButton" class="button button-secondary button-audio">🔊 Play Alert</button>
+        {% endif %}
+    </div>
+
+  </div> {# End container #}
+
+  {# --- Audio Element --- #}
+  <audio id="criticalBeep" src="{{ url_for('static', filename='beep.mp3') }}" preload="auto"></audio>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const mediaElement = document.getElementById('result-media');
+        const loaderElement = document.getElementById('media-loader');
+        const predictionStatusElement = document.getElementById('prediction-status');
+        const isCriticalElement = document.getElementById('is-critical');
+        const audioElement = document.getElementById('criticalBeep');
+        const playAlertButton = document.getElementById('playAlertButton');
+
+        // --- Media Loading Handling ---
+        if (mediaElement) {
+            const mediaLoaded = () => {
+                loaderElement.style.display = 'none'; // Hide spinner
+                mediaElement.style.display = 'block'; // Show media
+                // Update alt text after loading, using status
+                const statusText = predictionStatusElement ? predictionStatusElement.value : 'Unknown Status';
+                mediaElement.alt = `Analysis result showing: ${statusText}`;
+            };
+
+            if (mediaElement.tagName === 'IMG') {
+                if (mediaElement.complete) {
+                    mediaLoaded();
+                } else {
+                    mediaElement.onload = mediaLoaded;
+                }
+            } else if (mediaElement.tagName === 'VIDEO') {
+                 // Use 'loadeddata' for video, indicates enough data to play
+                mediaElement.onloadeddata = mediaLoaded;
             }
-        } else {
-            console.warn("Could not find status element or audio element.");
+
+            // Fallback if media fails to load
+            mediaElement.onerror = () => {
+                loaderElement.style.display = 'none';
+                mediaElement.style.display = 'none';
+                // Optionally display an error message in the media area
+                const errorP = document.createElement('p');
+                errorP.className = 'error-message';
+                errorP.textContent = '⚠️ Failed to load analysis media.';
+                mediaElement.parentElement.appendChild(errorP);
+                 mediaElement.alt = `Failed to load analysis media.`;
+            };
+        } else if (loaderElement) {
+            // If there's no media element URL provided from the start, hide loader
+             loaderElement.style.display = 'none';
         }
-    </script>
+
+
+        // --- Audio Alert Logic ---
+        const playAudio = () => {
+            if (audioElement) {
+                audioElement.play().catch(error => {
+                  // Log warning, inform user interaction might be needed
+                  console.warn('Audio playback failed (likely requires user interaction):', error);
+                   // Optionally display a small message near the button
+                   if(playAlertButton) {
+                       const warnMsg = document.createElement('span');
+                       warnMsg.textContent = ' (Click again to play sound)';
+                       warnMsg.style.fontSize = '0.8em';
+                       warnMsg.style.marginLeft = '5px';
+                       playAlertButton.parentElement.appendChild(warnMsg);
+                       // Remove message after a few seconds
+                       setTimeout(() => warnMsg.remove(), 5000);
+                   }
+                });
+            }
+        };
+
+        // Attempt autoplay if status is critical
+        if (isCriticalElement && isCriticalElement.value === 'true') {
+            playAudio(); // Attempt initial play
+        }
+
+        // Add click listener to the manual play button
+        if (playAlertButton) {
+            playAlertButton.addEventListener('click', playAudio);
+        }
+    });
+  </script>
 
 </body>
 </html>
