@@ -38,14 +38,14 @@ The primary objective of the Stampede Predictor project is to develop and deploy
 
 ### Team Members:
 
-- Your Name 1 (GitHub / LinkedIn / Role)
+- Nayana Shaji Mekkunnel (GitHub / LinkedIn / Role)
 
-- Your Name 2
+- Gabriel James
 
-- Your Name 3
+- Jany Sabarinath
 
-*(Add links if you want)*
-
+- Vrindha P
+  
 
 ### Your Approach:
 
