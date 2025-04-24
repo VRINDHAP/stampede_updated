@@ -4,5 +4,5 @@ ultralytics
 numpy
 fluvio
 werkzeug
-mimetypes
-shutil
+#mimetypes
+#shutil
