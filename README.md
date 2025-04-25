@@ -148,7 +148,7 @@ Add images, GIFs, or screenshots if helpful!
 1.  **Clone the repository:**
 
     ```bash
-    git clone https://github.com/gabsgj/Stampede-Predictor
+    git clone https://github.com/gabsgj/Stampede-Predictor.git
     cd Stampede-Predictor
     ```
 
