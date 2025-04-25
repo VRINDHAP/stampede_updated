@@ -13,7 +13,7 @@
 ## 📌 Problem Statement
 
 
-Problem Statement: Enhancing Public Safety through Proactive Crowd Monitoring
+PS 3: Real-Time Data Experiences with Fluvio
 
 
 ---
@@ -38,13 +38,13 @@ The primary objective of the Stampede Predictor project is to develop and deploy
 
 ### Team Members:
 
-- Nayana Shaji Mekkunnel (GitHub / LinkedIn / Role)
+- Nayana Shaji Mekkunnel (https://www.linkedin.com/in/nayana-shaji-394124320)
 
-- Gabriel James
+- Gabriel James (https://www.linkedin.com/in/gabrieljamesamara)
 
-- Jany Sabarinath
+- Jany Sabarinath (https://www.linkedin.com/in/jany-sabarinath-b38192317)
 
-- Vrindha P
+- Vrindha P (https://www.linkedin.com/in/vrindha-p)
 
 
 ### Your Approach:
@@ -83,8 +83,6 @@ The primary objective of the Stampede Predictor project is to develop and deploy
 ## ✨ Key Features
 
 
-Highlight the most important features of your project:
-
 
 - ✅ **Real-time Live Analysis:** Provides a live video feed from a selected camera source, analyzing crowd density and predicting risk in real-time with visual overlays.
 - ✅ **Media File Analysis:** Allows users to upload image or video files for detailed, frame-by-frame or image analysis of crowd density and stampede risk.
@@ -120,14 +118,12 @@ Add images, GIFs, or screenshots if helpful!
 ## ✅ Tasks & Bonus Checklist
 
 
-- [ ] **All members of the team completed the mandatory task - Followed at least 2 of our social channels and filled the form** (Details in Participant Manual)
+- ✅ **All members of the team completed the mandatory task - Followed at least 2 of our social channels and filled the form** 
 
-- [ ] **All members of the team completed Bonus Task 1 - Sharing of Badges and filled the form (2 points)** (Details in Participant Manual)
+- ✅ **All members of the team completed Bonus Task 1 - Sharing of Badges and filled the form** 
 
-- [ ] **All members of the team completed Bonus Task 2 - Signing up for Sprint.dev and filled the form (3 points)** (Details in Participant Manual)
+- ✅ **All members of the team completed Bonus Task 2 - Signing up for Sprint.dev and filled the form** 
 
-
-*(Mark with ✅ if completed)*
 
 
 ---
@@ -152,8 +148,8 @@ Add images, GIFs, or screenshots if helpful!
 1.  **Clone the repository:**
 
     ```bash
-    git clone [https://github.com/your-team/project-name.git](https://github.com/your-team/project-name.git)
-    cd project-name
+    git clone https://github.com/gabsgj/Stampede-Predictor
+    cd Stampede-Predictor
     ```
 
 2.  **Set up a Python Virtual Environment (Recommended):**
@@ -228,8 +224,6 @@ Add images, GIFs, or screenshots if helpful!
 ## 🧬 Future Scope
 
 
-List improvements, extensions, or follow-up features:
-
 
 - 📈 **Advanced Fluvio Consumer Analytics:** Enhance the `predict_stampede.py` script or create a separate service to perform more complex analysis on the Fluvio data stream, such as long-term trend analysis, anomaly detection, or integrating with databases for historical data storage and querying.
 - 🛡️ **Model Selection and Management:** Implement functionality within the web application to allow users to select different pre-trained YOLO models or even upload custom-trained models.
@@ -261,9 +255,15 @@ List improvements, extensions, or follow-up features:
 ## 🏁 Final Words
 
 
-Share your hackathon journey — challenges, learnings, fun moments, or shout-outs!
+Hackathons are always a rollercoaster, and this one was no different! Building Stampede Predictor pushed us to explore real-time video analysis, integrate streaming tech like Fluvio, and think deeply about safety in high-density environments.
 
-*(Add your team's personal touch here!)*
+Our journey was full of late-night debugging, unexpected breakthroughs, and countless cups of coffee. We’re proud of what we’ve created in a limited time—a functional, scalable system that could genuinely make a difference.
+
+Huge thanks to the organizers, mentors, and community that made this hackathon such an inspiring experience. We learned a ton, laughed a lot, and came away with a project we're truly excited about.
+
+We hope this tool sparks ideas, conversations, and maybe even collaborations. Feel free to fork, build on, or reach out!
+
+— Team Arete 👣🔍💡
 
 
 ---
