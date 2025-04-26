@@ -2,397 +2,460 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Processing Results</title>
-  <link rel="icon" href="{{ url_for('static', filename='StampedeAi_lcon.png') }}" type="image/png">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Processing Results - Stampede Predictor</title>
+  <link rel="icon" href="{{ url_for('static', filename='StampedeAi_Icon.png') }}" type="image/png"> <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap');
+    /* --- Replicated Styles (Ideally from a shared CSS) --- */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap'); /* [cite: 373] */
 
-    :root {
-        --status-low-bg: #ecfdf5;
-        --status-low-fg: #047857;
-        --status-low-border: #a7f3d0;
+    :root { /* Define common colors - adapted from live.html & index.html */
+      --primary-dark: #0f172a; /* [cite: 373] */
+      --primary-blue: #3b82f6; /* [cite: 373] */
+      --white: #ffffff; /* [cite: 376] */
+      --text-dark: #1e293b; /* [cite: 375] */
+      --text-muted: #64748b; /* [cite: 159] */
+      --bg-gradient-start: #f7f9fc; /* [cite: 376] */
+      --bg-gradient-end: #dbeafe; /* [cite: 376] */
+      --border-grey: #ccc; /* [cite: 376] */
+      --shadow-light: rgba(0, 0, 0, 0.05); /* Adjusted from [cite: 131] */
+      --shadow-medium: rgba(0, 0, 0, 0.1); /* Adjusted from [cite: 388] */
 
-        --status-moderate-bg: #fef9c3; /* Lighter yellow */
-        --status-moderate-fg: #a16207; /* Darker yellow/brown */
-        --status-moderate-border: #fde68a;
+      /* Status colors (Consider aligning with live.html vars) */
+      --status-critical-bg: #fee2e2; /* [cite: 139] */
+      --status-critical-fg: #b91c1c; /* [cite: 139] */
+      --status-critical-border: #fca5a5; /* [cite: 139] */
 
-        --status-high-bg: #fee2e2;
-        --status-high-fg: #b91c1c;
-        --status-high-border: #fca5a5;
+      --status-warning-bg: #fef3c7; /* [cite: 138] */
+      --status-warning-fg: #b45309; /* [cite: 138] */
+      --status-warning-border: #fde68a; /* [cite: 138] */
 
-        --status-critical-bg: #fca5a5; /* More intense red background */
-        --status-critical-fg: #7f1d1d; /* Darker red text */
-        --status-critical-border: #dc2626; /* Stronger border */
+      --status-normal-bg: #ecfdf5; /* [cite: 136] */
+      --status-normal-fg: #047857; /* [cite: 137] */
+      --status-normal-border: #a7f3d0; /* [cite: 137] */
 
-        --button-primary-bg: #3b82f6;
-        --button-primary-hover-bg: #2563eb;
-        --button-secondary-bg: #6b7280; /* Grey for secondary actions */
-        --button-secondary-hover-bg: #4b5563;
+      --error-bg: var(--status-critical-bg);
+      --error-fg: var(--status-critical-fg); /* [cite: 147] */
+      --error-border: var(--status-critical-border);
+    }
+
+    * {
+      box-sizing: border-box; /* [cite: 379] */
+      margin: 0; /* [cite: 379] */
+      padding: 0; /* [cite: 380] */
+    }
+
+    html {
+        scroll-behavior: smooth; /* [cite: 381] */
+        scroll-padding-top: 80px; /* Adjust to match header height */ /* [cite: 382] */
     }
 
     body {
-      font-family: 'Poppins', sans-serif;
-      background: linear-gradient(to right, #eef2ff, #e0f2fe);
-      color: #1e293b;
-      margin: 0;
-      padding: 20px;
+      font-family: 'Poppins', sans-serif; /* [cite: 128, 383] */
+      background: linear-gradient(to right, var(--bg-gradient-start), var(--bg-gradient-end)); /* [cite: 129, 383] */
+      color: var(--text-dark); /* [cite: 129, 375] */
+      margin: 0; /* [cite: 129] */
+      line-height: 1.6; /* [cite: 384] */
+      min-height: 100vh;
+      position: relative;
+      padding-top: 75px; /* Space for fixed header */
+      padding-bottom: 80px; /* Space for footer */
+      overflow-x: hidden; /* [cite: 385] */
     }
 
-    .container {
-      max-width: 900px;
-      margin: 40px auto;
-      background: #ffffff;
-      padding: 30px;
-      border-radius: 20px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+    /* Navbar Styles (from index.html) */
+    nav {
+      background-color: var(--primary-dark); /* [cite: 386] */
+      color: var(--white); /* [cite: 386] */
+      padding: 10px 30px; /* Adjusted padding */
+      display: flex; /* [cite: 387] */
+      justify-content: space-between; /* [cite: 387] */
+      align-items: center; /* [cite: 387] */
+      box-shadow: 0 4px 10px var(--shadow-medium); /* [cite: 388] */
+      position: fixed; /* Changed to fixed */
+      top: 0; /* [cite: 388] */
+      left: 0;
+      right: 0;
+      z-index: 1000; /* [cite: 388] */
+      min-height: 60px; /* [cite: 389] */
     }
 
-    h1, h2 {
-      text-align: center;
-      margin: 0 0 15px;
+    .logo-container {
+      display: flex; /* [cite: 390] */
+      align-items: center; /* [cite: 391] */
+      gap: 10px; /* [cite: 392] */
+    }
+
+    .logo-container img {
+      height: 45px; /* Adjusted size */ /* Similar to [cite: 394] */
+    }
+
+    nav h2 {
+      margin: 0; /* [cite: 396] */
+      font-size: 1.4rem; /* Adjusted size */ /* Similar to [cite: 397] */
+      font-weight: 600; /* [cite: 397] */
+      color: var(--white); /* [cite: 397] */
+    }
+
+    nav ul {
+      list-style: none; /* [cite: 398] */
+      display: flex; /* [cite: 398] */
+      gap: 25px; /* [cite: 399] */
+      margin: 0; /* [cite: 399] */
+      padding: 0; /* [cite: 400] */
+    }
+
+    nav ul li a {
+      color: var(--white); /* [cite: 401] */
+      text-decoration: none; /* [cite: 401] */
+      font-weight: 500; /* [cite: 401] */
+      position: relative; /* [cite: 402] */
+      padding-bottom: 5px; /* [cite: 402] */
+      transition: color 0.3s; /* [cite: 402] */
+    }
+
+    nav ul li a::after {
+      content: ""; /* [cite: 403] */
+      position: absolute; /* [cite: 403] */
+      width: 0; /* [cite: 403] */
+      height: 3px; /* [cite: 403] */
+      bottom: 0; /* [cite: 404] */
+      left: 0; /* [cite: 404] */
+      background: var(--primary-blue); /* Adjusted color */ /* Similar to [cite: 404] */
+      transition: width 0.3s ease-in-out; /* [cite: 404] */
+      border-radius: 2px; /* [cite: 404] */
+    }
+
+    nav ul li a:hover::after {
+      width: 100%; /* [cite: 405] */
+    }
+
+    nav ul li a:hover {
+      color: var(--primary-blue); /* Adjusted color */ /* Similar to [cite: 406] */
+    }
+
+    /* --- Results Page Specific Styles --- */
+    .results-content {
+      max-width: 900px; /* [cite: 130] */
+      margin: 30px auto; /* Adjusted margin */
+      background: var(--white); /* [cite: 130] */
+      padding: 30px 40px; /* Adjusted padding */ /* [cite: 131] */
+      border-radius: 20px; /* [cite: 131] */
+      box-shadow: 0 10px 25px var(--shadow-light); /* [cite: 131] */
+      backdrop-filter: blur(5px); /* Optional: subtle blur */
     }
 
     h1 {
-      font-size: 2rem;
-      color: #0f172a;
+      text-align: center; /* [cite: 132] */
+      margin: 0 0 25px; /* Adjusted margin */ /* [cite: 132] */
+      font-size: 2.1rem; /* [cite: 133] */
+      color: var(--primary-dark); /* [cite: 134] */
+      font-weight: 700; /* [cite: 419] */
     }
 
     h2 {
-      font-size: 1.3rem;
-      color: #1d4ed8; /* Keep blue for section titles */
+      font-size: 1.4rem; /* Adjusted */ /* [cite: 134] */
+      margin-bottom: 8px; /* [cite: 132] */
+      font-weight: 600;
     }
 
     .status-container {
-      text-align: center;
-      padding: 20px;
-      border-radius: 12px;
-      font-weight: 600;
-      margin-bottom: 30px;
-      transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
-      border: 1px solid transparent; /* Start with transparent border */
+      text-align: center; /* [cite: 135] */
+      padding: 20px; /* [cite: 135] */
+      border-radius: 12px; /* [cite: 135] */
+      font-weight: 600; /* [cite: 135] */
+      margin-bottom: 30px; /* [cite: 136] */
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; /* [cite: 136] */
+      border: 1px solid transparent;
     }
 
-    /* Status styling using CSS variables */
+    /* Status Color Classes */
     .status-low {
-      background-color: var(--status-low-bg);
-      color: var(--status-low-fg);
-      border-color: var(--status-low-border);
+      background-color: var(--status-normal-bg); /* [cite: 136] */
+      color: var(--status-normal-fg); /* [cite: 137] */
+      border-color: var(--status-normal-border); /* [cite: 137] */
     }
 
     .status-moderate {
-      background-color: var(--status-moderate-bg);
-      color: var(--status-moderate-fg);
-      border-color: var(--status-moderate-border);
+      background-color: var(--status-warning-bg); /* [cite: 138] */
+      color: var(--status-warning-fg); /* [cite: 138] */
+      border-color: var(--status-warning-border); /* [cite: 138] */
     }
 
     .status-high {
-      background-color: var(--status-high-bg);
-      color: var(--status-high-fg);
-      border-color: var(--status-high-border);
-    }
-
-    .status-critical {
-      background-color: var(--status-critical-bg);
-      color: var(--status-critical-fg);
-      border: 2px solid var(--status-critical-border); /* Thicker border for critical */
-    }
-
-    .status-title {
-        font-size: 1.1rem; /* Slightly smaller title inside status box */
-        margin-bottom: 8px;
-        color: inherit; /* Inherit color from parent */
+      background-color: var(--status-critical-bg); /* [cite: 139] */
+      color: var(--status-critical-fg); /* [cite: 139] */
+      border-color: var(--status-critical-border); /* [cite: 139] */
     }
 
     .risk-badge {
-      font-size: 1.2rem; /* Slightly larger badge text */
-      font-weight: bold;
+      font-size: 1.2rem; /* Increased size */ /* [cite: 139] */
+      margin-top: 5px; /* [cite: 140] */
+      font-weight: bold; /* [cite: 140] */
     }
 
-    /* Metrics Section */
+    .media-display h3 { /* Added heading for media section */
+        text-align: center;
+        font-size: 1.3rem;
+        color: var(--primary-dark);
+        margin-bottom: 15px;
+    }
+
+    video, img {
+      display: block; /* [cite: 141] */
+      margin: 10px auto 15px auto; /* Adjusted margin */ /* [cite: 142] */
+      max-width: 100%; /* [cite: 142] */
+      max-height: 65vh; /* Adjusted height */ /* [cite: 142] */
+      border-radius: 12px; /* [cite: 142] */
+      
+      object-fit: contain; /* [cite: 142] */
+      box-shadow: 0 4px 12px var(--shadow-light); /* Added shadow */
+    }
+    
+    video {
+      border: 1px solid var(--border-grey); /* [cite: 142] */
+    }
+
+    .media-caption {
+      text-align:center; /* [cite: 151] */
+      font-size:0.9em; /* [cite: 152] */
+      color: var(--text-muted); /* [cite: 152] */
+      margin-top: -5px;
+      margin-bottom: 25px;
+    }
+
     .metrics {
-      text-align: center;
-      padding: 15px 0;
-      margin-top: 20px;
-      border-top: 1px solid #e5e7eb; /* Separator line */
+      text-align: center; /* [cite: 140] */
+      margin: 30px 0 20px 0; /* Adjusted margin */
+      padding: 15px;
+      background-color: #f8f9fa; /* Light background for metrics */
+      border-radius: 10px;
+      border: 1px solid #eee;
     }
 
     .metrics p {
-      font-size: 0.95rem;
-      color: #475569;
-      margin: 10px 0; /* Reduced margin */
-    }
-    .metrics strong {
-        color: #1e293b; /* Darker color for metric values */
+      font-size: 1rem; /* Increased size */ /* [cite: 140] */
+      color: var(--text-grey); /* [cite: 141] */
+      margin: 8px 0; /* Adjusted margin */ /* [cite: 141] */
     }
 
-    /* Media Display Area */
-    .media-display {
-        text-align: center; /* Center content */
-        min-height: 100px; /* Ensure container has height while loading */
-        position: relative; /* Needed for spinner positioning */
-    }
-
-    .media-display img,
-    .media-display video {
-      display: none; /* Hidden until loaded */
-      margin: 20px auto;
-      max-width: 100%;
-      max-height: 65vh; /* Adjusted max height */
-      border-radius: 12px;
-      border: 1px solid #ccc;
-      object-fit: contain;
-    }
-
-    /* Simple CSS Spinner */
-    .spinner {
-        border: 5px solid #f3f3f3; /* Light grey */
-        border-top: 5px solid var(--button-primary-bg); /* Blue */
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        animation: spin 1.5s linear infinite;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        display: block; /* Shown by default */
-    }
-
-    @keyframes spin {
-      0% { transform: translate(-50%, -50%) rotate(0deg); }
-      100% { transform: translate(-50%, -50%) rotate(360deg); }
-    }
-
-    /* Button Styles */
-    .button { /* General button class */
-      color: white;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      font-size: 1rem;
+    .metrics p strong {
+      color: var(--text-dark);
       font-weight: 600;
-      display: inline-block; /* Changed from block */
-      margin: 10px 5px; /* Add some margin around buttons */
-      text-align: center;
-      text-decoration: none;
-      transition: background-color 0.3s ease, transform 0.2s ease;
-    }
-    .button:hover {
-        transform: scale(1.03);
     }
 
-    .button-primary { /* Download button style */
-        background-color: var(--button-primary-bg);
-    }
-    .button-primary:hover {
-        background-color: var(--button-primary-hover-bg);
-    }
-
-    .button-secondary { /* Back/Play Alert button style */
-        background-color: var(--button-secondary-bg);
-    }
-    .button-secondary:hover {
-        background-color: var(--button-secondary-hover-bg);
-    }
-
-    .button-audio { /* Specific style for audio button */
-        padding: 8px 15px; /* Smaller padding */
-        font-size: 0.9rem;
+    .download-button {
+      background-color: var(--primary-blue); /* [cite: 143] */
+      color: white; /* [cite: 143] */
+      padding: 12px 24px; /* [cite: 143] */
+      border: none; /* [cite: 143] */
+      border-radius: 10px; /* [cite: 144] */
+      cursor: pointer; /* [cite: 144] */
+      font-size: 1rem; /* [cite: 144] */
+      font-weight: 600;
+      display: block; /* [cite: 144] */
+      width: fit-content; /* Fit button to text */
+      margin: 25px auto; /* [cite: 144] */
+      text-align: center; /* [cite: 144] */
+      text-decoration: none; /* [cite: 144] */
+      transition: background-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease; /* [cite: 144, 145] */
     }
 
-
-    .action-area { /* Container for buttons */
-        text-align: center;
-        margin-top: 25px;
+    .download-button:hover {
+      background-color: #2563eb; /* [cite: 145] */
+      transform: translateY(-2px) scale(1.03); /* [cite: 145] */
+      box-shadow: 0 6px 15px var(--shadow-light); /* Added shadow */
     }
 
     .error-message {
-      text-align: center;
-      color: #dc2626;
-      font-weight: bold;
-      margin-top: 20px;
-      background-color: #fee2e2;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid #fca5a5;
+      text-align: center; /* [cite: 147] */
+      color: var(--error-fg); /* [cite: 147] */
+      background-color: var(--error-bg);
+      border: 1px solid var(--error-border);
+      font-weight: bold; /* [cite: 147] */
+      margin: 20px auto; /* [cite: 147] */
+      padding: 15px;
+      border-radius: 10px;
+      max-width: 80%;
     }
+    .error-message p {
+      margin: 5px 0;
+    }
+
+    .error-details {
+      font-size: 0.9em; /* [cite: 154] */
+      font-weight: normal;
+    }
+
+    /* Footer Styles (from index.html) */
+     footer {
+      text-align: center; /* [cite: 470] */
+      padding: 20px; /* [cite: 470] */
+      font-size: 0.9rem; /* [cite: 470] */
+      color: var(--text-muted); /* [cite: 470] */
+      margin-top: 40px; /* [cite: 471] */
+      background-color: #f1f5f9; /* Similar to [cite: 270] */
+      border-top: 1px solid #e2e8f0; /* [cite: 270] */
+      position: absolute; /* [cite: 270] */
+      bottom: 0; /* [cite: 270] */
+      width: 100%; /* [cite: 270] */
+    }
+     footer div {
+        max-width: 700px; /* [cite: 472] */
+        margin: 0 auto; /* [cite: 473] */
+    }
+    footer span {
+        font-weight: 600; /* [cite: 519] */
+    }
+    footer p:last-child {
+        font-size: 0.8em; /* [cite: 519] */
+        color: #888; /* [cite: 519] */
+    }
+
+    /* Hamburger placeholder (if implementing mobile nav toggle) */
+    .hamburger { display: none; } /* [cite: 407] */
+
+    /* Media Queries for Responsiveness */
+    @media (max-width: 768px) {
+        body {
+            padding-top: 65px; /* Adjust if mobile header height changes */
+            padding-bottom: 100px; /* Adjust for footer */
+        }
+        nav {
+            padding: 8px 20px; /* [cite: 475] */
+            min-height: 55px; /* [cite: 476] */
+        }
+        .logo-container img { height: 35px; } /* [cite: 478] */
+        nav h2 { font-size: 1.2rem; } /* [cite: 480] */
+        nav ul { display: none; } /* Hide desktop nav items, implement mobile menu if needed */
+
+        .results-content {
+            padding: 20px; /* [cite: 497] */
+            margin: 20px auto; /* [cite: 498] */
+        }
+        h1 { font-size: 1.8rem; } /* [cite: 499] */
+        h2 { font-size: 1.2rem; }
+        .risk-badge { font-size: 1.1rem; } /* [cite: 139] */
+        .media-display h3 { font-size: 1.1rem; }
+        .metrics p { font-size: 0.9rem; } /* [cite: 140] */
+        .download-button { padding: 10px 20px; font-size: 0.9rem; } /* [cite: 143] */
+        .error-message { max-width: 90%; }
+    }
+
   </style>
 </head>
 <body>
 
-  <div class="container">
+  <nav>
+     <div class="logo-container">
+        <img src="{{ url_for('static', filename='StampedeAi_Logo.png') }}" alt="Stampede AI Logo"> <h2>Stampede Predictor</h2>
+     </div>
+     <div class="hamburger">
+        <div class="line"></div> <div class="line"></div> <div class="line"></div> </div>
+     <ul>
+       <li><a href="{{ url_for('index_route') }}">Home</a></li> <li><a href="{{ url_for('live_route') }}">Live Feed</a></li> </ul>
+  </nav>
+
+  <div class="results-content">
     <h1>📊 Media Analysis Result</h1>
 
-    {# --- Determine Status Class and Labels --- #}
-    {% set status_class = 'status-low' %}
-    {% set density_label = 'Low Crowd Density' %}
-    {% set critical_status = false %}
-    {% if 'CRITICAL RISK' in prediction_status %}
-        {% set status_class = 'status-critical' %}
-        {% set density_label = 'Critical Risk Detected' %}
-        {% set critical_status = true %}
-    {% elif 'Critical Density Cell Detected' in prediction_status %}
-        {% set status_class = 'status-high' %} {# Use High status for detected critical cells #}
-        {% set density_label = 'High Crowd Density (Critical Cells Present)' %}
-        {% set critical_status = true %}
-    {% elif 'Warning' in prediction_status %}
-        {% set status_class = 'status-moderate' %}
-        {% set density_label = 'Moderate Crowd Density (Warning)' %}
-    {% elif 'Detected' in prediction_status %}
-        {% set status_class = 'status-moderate' %}
-        {% set density_label = 'Moderate Crowd Density' %}
-    {% elif 'Error' in prediction_status %}
-        {% set status_class = 'status-error' %} {# Add an error class if needed #}
-        {% set density_label = 'Processing Error' %}
+    {# Determine and assign density level classes #}
+    {% set status_class = 'status-low' %} {# Default class [cite: 148] #}
+    {% set density_label = 'Low Crowd Density' %} {# Default label [cite: 148] #}
+    {% if prediction_status and ('CRITICAL RISK' in prediction_status or 'Critical Density Cell Detected' in prediction_status) %} {# [cite: 148] #}
+        {% set status_class = 'status-high' %} {# [cite: 148] #}
+        {% set density_label = 'High Crowd Density (⚠️ Critical Risk)' %} {# [cite: 148] #}
+    {% elif prediction_status and 'Warning' in prediction_status %} {# [cite: 148] #}
+        {% set status_class = 'status-moderate' %} {# [cite: 149] #}
+        {% set density_label = 'Moderate Crowd Density (⚠️ Warning)' %} {# [cite: 149] #}
+    {% elif prediction_status and 'Detected' in prediction_status %} {# [cite: 149] #}
+        {% set status_class = 'status-moderate' %} {# [cite: 149] #}
+        {% set density_label = 'Moderate Crowd Density' %} {# [cite: 149] #}
+    {% elif prediction_status and 'Error' in prediction_status %}
+        {% set status_class = 'status-high' %} {# Use high risk color for errors #}
+        {% set density_label = 'Error During Analysis' %} {# Specific label for errors #}
     {% endif %}
 
-    {# --- Status Display --- #}
     <div class="status-container {{ status_class }}" id="status-container">
-      <div class="status-title">Overall Risk Assessment:</div>
+      <h2>Overall Risk Status:</h2>
       <div class="risk-badge">{{ density_label }}</div>
-      {# Hidden input to pass status to JS #}
-      <input type="hidden" id="prediction-status" value="{{ prediction_status | default('') }}">
-      <input type="hidden" id="is-critical" value="{{ 'true' if critical_status else 'false' }}">
-    </div>
+      {# Hidden input to easily access status in JS if needed #}
+      <input type="hidden" id="prediction-status" value="{{ prediction_status | default('Unknown Status') }}"> </div>
 
-    {# --- Media Display --- #}
-    <section class="media-display" aria-live="polite">
-      <div id="media-loader" class="spinner"></div> {# Loading Spinner #}
-
-      {% if processed_media_url %}
-        {% if output_media_type == 'video' %}
-          <h2>🖼️ Analysis Snapshot</h2>
-          <img id="result-media" src="{{ processed_media_url }}" alt="Analysis snapshot - Loading..." style="display: none;">
-          <p style="text-align:center; font-size:0.9em; color:#64748b;">
-            This image shows the frame from the video where the highest stampede risk was detected.
-          </p>
-        {% elif output_media_type == 'image' %}
-          <h2>🖼️ Processed Image</h2>
-          <img id="result-media" src="{{ processed_media_url }}" alt="Processed image - Loading..." style="display: none;">
-        {% else %}
-          <p class="error-message">Unknown media type processed.</p> {# Handle unknown type #}
-          <img id="result-media" src="{{ processed_media_url }}" alt="Processed media - Loading..." style="display: none;">
-        {% endif %}
-      {% else %}
-        <p class="error-message">⚠️ Media processing failed or no visual output generated.</p>
-        {% if 'Error' in prediction_status %}
-          {# NOTE: Pass specific error detail from backend if possible #}
-          <p class="error-message" style="font-size:0.9em;">Details: {{ prediction_status }}</p>
-        {% endif %}
-        {# Hide spinner if there's definitely no media URL #}
-        <script>document.getElementById('media-loader').style.display = 'none';</script>
-      {% endif %}
-    </section>
-
-    {# --- Metrics --- #}
-    <section class="metrics">
-      <p>👥 Max Persons Detected: <strong>{{ max_persons | default('N/A') }}</strong></p>
-      <p>⏱️ Processing Time: <strong>{{ processing_time | default('N/A') }}</strong> seconds</p>
-    </section>
-
-    {# --- Action Buttons Area --- #}
-    <div class="action-area">
-        {% if output_media_type == 'video' %}
-            {% if download_video_url %}
-              <a href="{{ download_video_url }}" download class="button button-primary">⬇️ Download Full Processed Video</a>
-            {% else %}
-              <p class="error-message">⚠️ Full processed video could not be generated.</p>
-              {# Optionally add specific error detail from backend here #}
+    {% if processed_media_url %}
+      <div class="media-display">
+          {% if output_media_type == 'video' %}
+            <h3>🖼️ Most Critical Frame</h3>
+            <img src="{{ processed_media_url }}" alt="Critical Frame from Video Analysis"> <p class="media-caption">(Snapshot based on full video analysis)</p> {% if download_video_url %}
+              <a href="{{ download_video_url }}" download class="download-button">⬇️ Download Full Processed Video</a> {% else %}
+              <div class="error-message">
+                  <p>⚠️ Full processed video could not be generated or is unavailable.</p> </div>
             {% endif %}
-        {% endif %}
+          {% elif output_media_type == 'image' %}
+            <h3>🖼️ Processed Image</h3>
+            <img src="{{ processed_media_url }}" alt="Processed Image"> {% else %}
+            {# Fallback for unknown type if URL exists #}
+            <h3>🖼️ Processed Media</h3>
+            <img src="{{ processed_media_url }}" alt="Processed Media"> <p class="media-caption">(Displayed as image due to unrecognized type: {{ output_media_type | default('Unknown') }})</p>
+          {% endif %}
+      </div>
 
-        {# Always show back button #}
-        <a href="{{ url_for('index_route') }}" class="button button-secondary">← Go Back</a>
+      <div class="metrics">
+        <p>👥 Max Persons Detected: <strong>{{ max_persons | default('N/A') }}</strong></p> <p>⏱️ Processing Time: <strong>{{ processing_time | default('N/A') }} seconds</strong></p> </div>
 
-        {# Show Play Alert button only if status is critical/high #}
-        {% if critical_status %}
-            <button id="playAlertButton" class="button button-secondary button-audio">🔊 Play Alert</button>
-        {% endif %}
-    </div>
+    {% else %}
+      {# Case where processing failed and no media URL generated #}
+      <div class="error-message">
+         <p>⚠️ Media processing failed.</p> {% if prediction_status and 'Error' in prediction_status %}
+             <p class="error-details">Details: {{ prediction_status }}</p> {% else %}
+             <p class="error-details">No processed media could be generated. Please check the input file or server logs.</p>
+         {% endif %}
+      </div>
+       {% if max_persons is defined or processing_time is defined %}
+           <div class="metrics">
+               <p>👥 Max Persons Detected: <strong>{{ max_persons | default('N/A') }}</strong></p>
+               <p>⏱️ Processing Time: <strong>{{ processing_time | default('N/A') }} seconds</strong></p>
+           </div>
+       {% endif %}
+    {% endif %}
 
-  </div> {# End container #}
+    </div> <footer>
+    <div>
+        <p>&copy; 2025 <span>Team Arete</span>. All rights reserved.</p> <p>Stampede Prediction Project</p> </div>
+  </footer>
 
-  {# --- Audio Element --- #}
-  <audio id="criticalBeep" src="{{ url_for('static', filename='beep.mp3') }}" preload="auto"></audio>
-
-  <script>
+  <audio id="criticalBeep" src="{{ url_for('static', filename='beep.mp3') }}" preload="auto"></audio> <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const mediaElement = document.getElementById('result-media');
-        const loaderElement = document.getElementById('media-loader');
-        const predictionStatusElement = document.getElementById('prediction-status');
-        const isCriticalElement = document.getElementById('is-critical');
-        const audioElement = document.getElementById('criticalBeep');
-        const playAlertButton = document.getElementById('playAlertButton');
+      const predictionStatusElement = document.getElementById('prediction-status'); // [cite: 155]
+      const audioElement = document.getElementById('criticalBeep'); // [cite: 155]
 
-        // --- Media Loading Handling ---
-        if (mediaElement) {
-            const mediaLoaded = () => {
-                loaderElement.style.display = 'none'; // Hide spinner
-                mediaElement.style.display = 'block'; // Show media
-                // Update alt text after loading, using status
-                const statusText = predictionStatusElement ? predictionStatusElement.value : 'Unknown Status';
-                mediaElement.alt = `Analysis result showing: ${statusText}`;
-            };
-
-            if (mediaElement.tagName === 'IMG') {
-                if (mediaElement.complete) {
-                    mediaLoaded();
-                } else {
-                    mediaElement.onload = mediaLoaded;
-                }
-            } else if (mediaElement.tagName === 'VIDEO') {
-                 // Use 'loadeddata' for video, indicates enough data to play
-                mediaElement.onloadeddata = mediaLoaded;
+      if (predictionStatusElement && audioElement) {
+        try {
+            const predictionStatus = predictionStatusElement.value; // [cite: 155]
+            // Play sound for critical or high warning statuses
+            if (predictionStatus.includes('CRITICAL RISK') || predictionStatus.includes('Critical Density Cell Detected') || predictionStatus.includes('Warning')) { // [cite: 156] // Added Warning
+              // Attempt to play audio, handling potential autoplay restrictions
+              audioElement.play().catch(error => { // [cite: 156]
+                console.warn('Autoplay prevented critical beep sound:', error);
+                // Optional: Display a visual cue for the user to enable sound
+              });
             }
-
-            // Fallback if media fails to load
-            mediaElement.onerror = () => {
-                loaderElement.style.display = 'none';
-                mediaElement.style.display = 'none';
-                // Optionally display an error message in the media area
-                const errorP = document.createElement('p');
-                errorP.className = 'error-message';
-                errorP.textContent = '⚠️ Failed to load analysis media.';
-                mediaElement.parentElement.appendChild(errorP);
-                 mediaElement.alt = `Failed to load analysis media.`;
-            };
-        } else if (loaderElement) {
-            // If there's no media element URL provided from the start, hide loader
-             loaderElement.style.display = 'none';
+        } catch (e) {
+            console.error("Error accessing prediction status for audio alert:", e);
         }
+      } else {
+          if (!predictionStatusElement) console.warn("Prediction status element not found for audio alert.");
+          if (!audioElement) console.warn("Audio element 'criticalBeep' not found.");
+      }
 
-
-        // --- Audio Alert Logic ---
-        const playAudio = () => {
-            if (audioElement) {
-                audioElement.play().catch(error => {
-                  // Log warning, inform user interaction might be needed
-                  console.warn('Audio playback failed (likely requires user interaction):', error);
-                   // Optionally display a small message near the button
-                   if(playAlertButton) {
-                       const warnMsg = document.createElement('span');
-                       warnMsg.textContent = ' (Click again to play sound)';
-                       warnMsg.style.fontSize = '0.8em';
-                       warnMsg.style.marginLeft = '5px';
-                       playAlertButton.parentElement.appendChild(warnMsg);
-                       // Remove message after a few seconds
-                       setTimeout(() => warnMsg.remove(), 5000);
-                   }
-                });
-            }
-        };
-
-        // Attempt autoplay if status is critical
-        if (isCriticalElement && isCriticalElement.value === 'true') {
-            playAudio(); // Attempt initial play
-        }
-
-        // Add click listener to the manual play button
-        if (playAlertButton) {
-            playAlertButton.addEventListener('click', playAudio);
-        }
+      // Optional: Add mobile navigation toggle JS here if hamburger is implemented
+      // const hamburger = document.querySelector('.hamburger');
+      // const navMenu = document.querySelector('nav ul');
+      // if(hamburger && navMenu) {
+      //   hamburger.addEventListener('click', () => {
+      //     navMenu.classList.toggle('active'); // Requires '.active' CSS for mobile menu display
+      //     document.body.classList.toggle('nav-open'); // Optional: for body styles when menu is open
+      //   });
+      // }
     });
   </script>
 
