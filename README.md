@@ -110,7 +110,7 @@ The primary objective of the Stampede Predictor project is to develop and deploy
 
 - **Demo Video Link:** https://youtu.be/KKmF_QUh2yI
 
-- **Pitch Deck / PPT Link:** [Paste Google Slides / PDF link here]
+- **Pitch Deck / PPT Link:** https://docs.google.com/presentation/d/1Fd9UWffBttgK-7Fp79mp1y321R-JdYkg/edit?usp=sharing&ouid=106906092757342451385&rtpof=true&sd=true
 
 
 ---
