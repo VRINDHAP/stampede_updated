@@ -95,10 +95,11 @@ The primary objective of the Stampede Predictor project is to develop and deploy
 - ✅ **Audio Alert Notification:** Plays an audible alert sound when the analysis of live camera view or an uploaded file indicates a critical risk level.
 - ✅ **Fluvio Data Streaming:** Publishes detailed crowd analysis data for each processed frame/image to a Fluvio topic, enabling real-time monitoring and integration with other data processing pipelines.
 
-
-Add images, GIFs, or screenshots if helpful!
-
-*(Consider adding screenshots of the `index.html`, `live.html`, and `results.html` pages here)*
+![Image](https://github.com/user-attachments/assets/1260a6ca-9091-4e04-a83d-284c270e5f74)
+![Image](https://github.com/user-attachments/assets/6ae86995-56da-415e-90ea-2461313dc8c8)
+![Image](https://github.com/user-attachments/assets/22fc3a27-6fe3-4e10-99c1-822d08ab749e)
+![Image](https://github.com/user-attachments/assets/efa1e4ed-2194-4ea4-b284-ac027a74ebd8)
+![Image](https://github.com/user-attachments/assets/7f348c71-ef26-4ba3-b042-9e79928458d6)
 
 
 ---
