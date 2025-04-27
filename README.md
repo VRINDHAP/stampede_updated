@@ -92,7 +92,7 @@ The primary objective of the Stampede Predictor project is to develop and deploy
 - ✅ **Real-time Person Count:** Shows the total number of detected persons in the current frame or image.
 - ✅ **Visual Risk Overlays:** Highlights grid cells exceeding high or critical density thresholds with color-coded overlays on the processed media.
 - ✅ **Critical Frame/Video Output:** For uploaded videos, the application identifies and displays the frame corresponding to the highest detected risk level and offers a download link for the full processed video with overlays.
-- ✅ **Audio Alert Notification:** Plays an audible alert sound on the results page when the analysis of an uploaded file indicates a critical risk level.
+- ✅ **Audio Alert Notification:** Plays an audible alert sound when the analysis of live camera view or an uploaded file indicates a critical risk level.
 - ✅ **Fluvio Data Streaming:** Publishes detailed crowd analysis data for each processed frame/image to a Fluvio topic, enabling real-time monitoring and integration with other data processing pipelines.
 
 
@@ -107,7 +107,7 @@ Add images, GIFs, or screenshots if helpful!
 ## 📽️ Demo & Deliverables
 
 
-- **Demo Video Link:** [Paste YouTube or Loom link here]
+- **Demo Video Link:** https://youtu.be/KKmF_QUh2yI
 
 - **Pitch Deck / PPT Link:** [Paste Google Slides / PDF link here]
 
@@ -217,6 +217,31 @@ Add images, GIFs, or screenshots if helpful!
 
     Use the web interface to upload media files or start the live webcam analysis. Observe the output in your browser and, if running, the data stream in the `predict_stampede.py` terminal.
 
+
+#### Optional: Adjusting Density Thresholds
+
+If you need to fine-tune the sensitivity of the crowd density detection, you can adjust the threshold values directly in the `app.py` file:
+
+1.  Open the `app.py` file in a text editor.
+2.  Locate the "Density Analysis Settings" section.
+3.  Modify the values for the following constants as needed:
+
+    ```python
+    HIGH_DENSITY_THRESHOLD = 5
+    CRITICAL_DENSITY_THRESHOLD = 8
+    HIGH_DENSITY_CELL_COUNT_THRESHOLD = 3
+    CRITICAL_DENSITY_CELL_COUNT_THRESHOLD = 2
+
+    DETECTION_THRESHOLD = 0.02125 # Confidence threshold for YOLO detections
+    ```
+
+    * `HIGH_DENSITY_THRESHOLD`: The number of persons in a grid cell to be considered high density.
+    * `CRITICAL_DENSITY_THRESHOLD`: The number of persons in a grid cell to be considered critical density.
+    * `HIGH_DENSITY_CELL_COUNT_THRESHOLD`: The number of high-density cells required to trigger a "High Density Warning" status.
+    * `CRITICAL_DENSITY_CELL_COUNT_THRESHOLD`: The number of critical-density cells required to trigger a "CRITICAL RISK" status.
+
+4.  Save the `app.py` file.
+5.  Restart the Flask web application (`python app.py`) for the changes to take effect.
 
 ---
 
